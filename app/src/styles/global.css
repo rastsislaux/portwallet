@@ -808,7 +808,7 @@ img {
   width: min(calc(100% - (var(--nav-side) * 2)), calc(var(--max-col) - (var(--nav-side) * 2)));
   height: var(--nav-height);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 2px;
   padding: 6px;
   z-index: 30;
