@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatFiat, formatQty } from '../components/Amount';
 import { CardCarousel } from '../components/CardCarousel';
-import { CryptoIcon } from '../components/icons';
+import { CryptoIcon, IconRefresh } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
 import type { CardOperation, ProviderCard } from '../domain/types';
 import { useSettings } from '../state/SettingsContext';
@@ -93,13 +93,19 @@ export function CardsScreen() {
         </div>
         <button
           type="button"
-          className="btn btn--text"
+          className="icon-button"
+          aria-label={isRefreshing ? 'Refreshing cards' : 'Refresh cards'}
+          title={isRefreshing ? 'Refreshing…' : 'Refresh'}
           disabled={isRefreshing}
           onClick={() => {
             void refresh();
           }}
         >
-          {isRefreshing ? 'Refreshing…' : 'Refresh'}
+          <IconRefresh
+            size={20}
+            strokeWidth={1.75}
+            className={isRefreshing ? 'icon-spin' : undefined}
+          />
         </button>
       </header>
 
