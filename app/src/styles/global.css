@@ -107,7 +107,6 @@ img {
 
 .screen--exchange .exchange-confirm {
   margin-top: auto;
-  padding-top: var(--space-4);
 }
 
 .screen > .btn--block:last-child,
