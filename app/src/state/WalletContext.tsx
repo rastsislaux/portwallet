@@ -13,6 +13,7 @@ import type {
   AssetBalance,
   CardCapability,
   CardOperation,
+  ConnectConfig,
   ExchangeQuote,
   ExchangeRequest,
   FundingAssetBalance,
@@ -52,7 +53,10 @@ type WalletContextValue = {
   custodySummary: string;
   availableProviderTypes: ReturnType<ProviderRegistry['listAvailableTypes']>;
   refresh: () => Promise<void>;
-  addAccount: (type: ProviderType, nickname: string) => Promise<WalletAccount>;
+  addAccount: (
+    type: ProviderType,
+    config: ConnectConfig,
+  ) => Promise<WalletAccount>;
   removeAccount: (accountId: string) => Promise<void>;
   prepareSend: (request: SendRequest) => Promise<SendPreview>;
   submitSend: (accountId: string, previewId: string) => Promise<OperationResult>;
@@ -122,15 +126,6 @@ function buildCustodySummary(accounts: WalletAccount[]): string {
   return `Custodial · ${venues.join(', ')}`;
 }
 
-async function bootstrapAccounts(): Promise<WalletAccount[]> {
-  const bybit = registry.getFactory('bybit');
-  const a1 = await bybit.connect({ nickname: 'Personal Bybit' });
-  registry.bindAccount(a1.id, bybit);
-  const a2 = await bybit.connect({ nickname: 'Trading Bybit' });
-  registry.bindAccount(a2.id, bybit);
-  return [a1, a2];
-}
-
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [accounts, setAccounts] = useState<WalletAccount[]>([]);
@@ -195,11 +190,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (didBootstrap.current) return;
     didBootstrap.current = true;
-    void (async () => {
-      const initial = await bootstrapAccounts();
-      setAccounts(initial);
-      setReady(true);
-    })();
+    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -217,13 +208,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [selectedAccounts],
   );
 
-  const addAccount = useCallback(async (type: ProviderType, nickname: string) => {
-    const provider = registry.getFactory(type);
-    const account = await provider.connect({ nickname });
-    registry.bindAccount(account.id, provider);
-    setAccounts((prev) => [...prev, account]);
-    return account;
-  }, []);
+  const addAccount = useCallback(
+    async (type: ProviderType, config: ConnectConfig) => {
+      const provider = registry.getFactory(type);
+      const account = await provider.connect(config);
+      registry.bindAccount(account.id, provider);
+      setAccounts((prev) => [...prev, account]);
+      return account;
+    },
+    [],
+  );
 
   const removeAccount = useCallback(
     async (accountId: string) => {
@@ -261,7 +255,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const listNetworks = useCallback(
     (accountId: string, assetSymbol: string) =>
-      registry.getForAccount(accountId).listNetworks(assetSymbol),
+      registry.getForAccount(accountId).listNetworks(accountId, assetSymbol),
     [],
   );
 

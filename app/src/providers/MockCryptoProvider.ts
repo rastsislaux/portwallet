@@ -425,7 +425,10 @@ export class MockCryptoProvider implements CryptoProvider {
     return [...(this.balances.get(accountId) ?? [])];
   }
 
-  async listNetworks(assetSymbol: string): Promise<NetworkInfo[]> {
+  async listNetworks(
+    _accountId: string,
+    assetSymbol: string,
+  ): Promise<NetworkInfo[]> {
     return NETWORKS.filter((n) => n.assetSymbol === assetSymbol);
   }
 

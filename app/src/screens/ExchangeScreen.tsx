@@ -7,7 +7,12 @@ import {
   IconSwap,
   ProviderIcon,
 } from '../components/icons';
-import type { ExchangeQuote, OperationResult } from '../domain/types';
+import type {
+  ExchangeQuote,
+  OperationResult,
+  WalletProduct,
+} from '../domain/types';
+import { WALLET_PRODUCT_LABELS } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
 type Step = 'form' | 'result';
@@ -37,6 +42,7 @@ export function ExchangeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [product, setProduct] = useState<Exclude<WalletProduct, 'EARN'>>('FUND');
 
   const accountOptions = useMemo(
     () =>
@@ -47,6 +53,30 @@ export function ExchangeScreen() {
   );
 
   const selectedAccount = accounts.find((a) => a.id === accountId);
+  const isBybit = selectedAccount?.providerType === 'bybit';
+  const exchangeBlocked =
+    isBybit && selectedAccount?.permissions
+      ? !selectedAccount.permissions.canExchange
+      : false;
+
+  const productOptions = useMemo(() => {
+    const products = balances
+      .filter(
+        (b) =>
+          b.accountId === accountId &&
+          b.symbol === fromSymbol &&
+          (b.product === 'FUND' || b.product === 'UNIFIED'),
+      )
+      .map((b) => b.product as Exclude<WalletProduct, 'EARN'>);
+    const unique = [...new Set(products)];
+    return unique.length > 0 ? unique : (['FUND'] as Exclude<WalletProduct, 'EARN'>[]);
+  }, [balances, accountId, fromSymbol]);
+
+  useEffect(() => {
+    if (!productOptions.includes(product)) {
+      setProduct(productOptions[0] ?? 'FUND');
+    }
+  }, [product, productOptions]);
 
   useEffect(() => {
     if (!assetSymbols.includes(fromSymbol) && assetSymbols[0]) {
@@ -77,6 +107,15 @@ export function ExchangeScreen() {
       return;
     }
 
+    if (exchangeBlocked) {
+      setQuote(null);
+      setError(
+        'This API key cannot exchange. Enable Exchange → ExchangeHistory, then reconnect.',
+      );
+      setQuoting(false);
+      return;
+    }
+
     let cancelled = false;
     setQuoting(true);
     setError(null);
@@ -89,6 +128,7 @@ export function ExchangeScreen() {
             fromSymbol,
             toSymbol,
             fromQuantity: qty,
+            product: isBybit ? product : undefined,
           });
           if (!cancelled) {
             setQuote(q);
@@ -109,7 +149,16 @@ export function ExchangeScreen() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [accountId, fromSymbol, toSymbol, quantity, prepareExchange]);
+  }, [
+    accountId,
+    fromSymbol,
+    toSymbol,
+    quantity,
+    prepareExchange,
+    product,
+    isBybit,
+    exchangeBlocked,
+  ]);
 
   function swapAssets() {
     setFromSymbol(toSymbol);
@@ -188,6 +237,25 @@ export function ExchangeScreen() {
             {accountOptions.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.nickname}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
+      {isBybit ? (
+        <div className="field" style={{ marginTop: 0 }}>
+          <label htmlFor="exchange-product">Wallet</label>
+          <select
+            id="exchange-product"
+            value={product}
+            onChange={(e) =>
+              setProduct(e.target.value as Exclude<WalletProduct, 'EARN'>)
+            }
+          >
+            {productOptions.map((p) => (
+              <option key={p} value={p}>
+                {WALLET_PRODUCT_LABELS[p]}
               </option>
             ))}
           </select>
@@ -325,7 +393,7 @@ export function ExchangeScreen() {
         type="button"
         className="btn btn--primary btn--block exchange-confirm"
         onClick={() => void onConfirm()}
-        disabled={busy || !quote || quoting}
+        disabled={busy || !quote || quoting || exchangeBlocked}
       >
         Confirm exchange
       </button>

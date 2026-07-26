@@ -21,6 +21,7 @@ export function ReceiveScreen() {
   const [networkId, setNetworkId] = useState('');
   const [receive, setReceive] = useState<ReceiveAddress | null>(null);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const accountOptions = useMemo(
     () =>
@@ -64,10 +65,21 @@ export function ReceiveScreen() {
     (async () => {
       if (!accountId || !networkId) {
         setReceive(null);
+        setError(null);
         return;
       }
-      const addr = await getReceiveAddress(accountId, asset, networkId);
-      if (!cancelled) setReceive(addr);
+      try {
+        const addr = await getReceiveAddress(accountId, asset, networkId);
+        if (!cancelled) {
+          setReceive(addr);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setReceive(null);
+          setError(e instanceof Error ? e.message : 'Could not load address');
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -77,6 +89,13 @@ export function ReceiveScreen() {
   async function copyAddress() {
     if (!receive) return;
     await navigator.clipboard.writeText(receive.address);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function copyTag() {
+    if (!receive?.tag) return;
+    await navigator.clipboard.writeText(receive.tag);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
   }
@@ -154,6 +173,8 @@ export function ReceiveScreen() {
         </div>
       </div>
 
+      {error ? <div className="notice notice--danger">{error}</div> : null}
+
       {receive ? (
         <>
           <div className="address-line">
@@ -163,6 +184,15 @@ export function ReceiveScreen() {
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
+          {receive.tag ? (
+            <div className="address-line">
+              <code className="tabular">Tag · {receive.tag}</code>
+              <button type="button" className="btn btn--icon" onClick={() => void copyTag()}>
+                <IconCopy size={16} />
+                Copy tag
+              </button>
+            </div>
+          ) : null}
           <div className="notice notice--warning">{receive.warning}</div>
         </>
       ) : null}

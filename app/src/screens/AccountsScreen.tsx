@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconBack, ProviderIcon } from '../components/icons';
-import type { ProviderType } from '../domain/types';
+import type { BybitServerId, ProviderType } from '../domain/types';
+import { BYBIT_SERVERS } from '../providers/bybit/servers';
 import { useWallet } from '../state/WalletContext';
 
 export function AccountsScreen() {
@@ -14,18 +15,42 @@ export function AccountsScreen() {
   const [adding, setAdding] = useState(false);
   const [type, setType] = useState<ProviderType>('bybit');
   const [nickname, setNickname] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [apiSecret, setApiSecret] = useState('');
+  const [bybitServer, setBybitServer] = useState<BybitServerId>('mainnet');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const selectedType = availableProviderTypes.find((t) => t.type === type);
+  const needsBybitCredentials = type === 'bybit';
+
+  const canConnect = useMemo(() => {
+    if (!nickname.trim()) return false;
+    if (needsBybitCredentials) {
+      return Boolean(apiKey.trim() && apiSecret.trim());
+    }
+    return true;
+  }, [nickname, needsBybitCredentials, apiKey, apiSecret]);
 
   async function onAdd() {
-    if (!nickname.trim()) return;
+    if (!canConnect) return;
     setBusy(true);
+    setError(null);
     try {
-      await addAccount(type, nickname.trim());
+      await addAccount(type, {
+        nickname: nickname.trim(),
+        apiKey: needsBybitCredentials ? apiKey.trim() : undefined,
+        apiSecret: needsBybitCredentials ? apiSecret.trim() : undefined,
+        bybitServer: needsBybitCredentials ? bybitServer : undefined,
+      });
       setNickname('');
+      setApiKey('');
+      setApiSecret('');
+      setBybitServer('mainnet');
       setAdding(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not connect account');
     } finally {
       setBusy(false);
     }
@@ -62,7 +87,13 @@ export function AccountsScreen() {
                 {account.venueLabel}
                 {' · '}
                 {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'}
+                {account.bybitServer ? ` · ${serverLabel(account.bybitServer)}` : ''}
               </div>
+              {account.permissions ? (
+                <div className="grouped-row__meta">
+                  {permissionSummary(account.permissions)}
+                </div>
+              ) : null}
             </div>
             <div className="grouped-row__aside">
               <span className="connection-dot">Connected</span>
@@ -78,10 +109,19 @@ export function AccountsScreen() {
         ))}
       </div>
 
+      {accounts.length === 0 ? (
+        <div className="empty" style={{ marginTop: 8 }}>
+          <p>Connect Bybit with an API key to load Funding, UTA, Earn, and Card data.</p>
+        </div>
+      ) : null}
+
       <button
         type="button"
         className="btn btn--block btn--soft add-account-btn"
-        onClick={() => setAdding(true)}
+        onClick={() => {
+          setError(null);
+          setAdding(true);
+        }}
       >
         Add account
       </button>
@@ -130,8 +170,56 @@ export function AccountsScreen() {
                       : 'e.g. Phone wallet'
                 }
                 onChange={(e) => setNickname(e.target.value)}
+                autoComplete="off"
               />
             </div>
+
+            {needsBybitCredentials ? (
+              <>
+                <div className="field">
+                  <label htmlFor="bybit-server">Bybit server</label>
+                  <select
+                    id="bybit-server"
+                    value={bybitServer}
+                    onChange={(e) => setBybitServer(e.target.value as BybitServerId)}
+                  >
+                    {BYBIT_SERVERS.map((server) => (
+                      <option key={server.id} value={server.id}>
+                        {server.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="bybit-api-key">API key</label>
+                  <input
+                    id="bybit-api-key"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="bybit-api-secret">API secret</label>
+                  <input
+                    id="bybit-api-secret"
+                    type="password"
+                    value={apiSecret}
+                    onChange={(e) => setApiSecret(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="notice notice--info" style={{ margin: 0 }}>
+                  Keys stay in this browser session only. Actions are blocked when the
+                  key lacks the required Bybit permission. Earn is view-only.
+                </div>
+              </>
+            ) : null}
+
+            {error ? <div className="notice notice--danger">{error}</div> : null}
+
             <div className="stack-actions">
               <button
                 type="button"
@@ -145,9 +233,9 @@ export function AccountsScreen() {
                 type="button"
                 className="btn btn--primary"
                 onClick={() => void onAdd()}
-                disabled={busy || !nickname.trim()}
+                disabled={busy || !canConnect}
               >
-                Connect
+                {busy ? 'Connecting…' : 'Connect'}
               </button>
             </div>
           </div>
@@ -160,7 +248,7 @@ export function AccountsScreen() {
             <h2 className="screen-title screen-title--sheet">Remove account?</h2>
             <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: 15, lineHeight: 1.4 }}>
               This only disconnects the account from Portwallet. Funds remain with the
-              provider.
+              provider. Session API keys for this account are discarded.
             </p>
             <div className="stack-actions">
               <button
@@ -185,4 +273,22 @@ export function AccountsScreen() {
       ) : null}
     </section>
   );
+}
+
+function serverLabel(id: BybitServerId): string {
+  return BYBIT_SERVERS.find((s) => s.id === id)?.label ?? id;
+}
+
+function permissionSummary(
+  permissions: NonNullable<import('../domain/types').WalletAccount['permissions']>,
+): string {
+  const bits: string[] = [];
+  if (permissions.readOnly) bits.push('Read-only');
+  if (permissions.uta) bits.push('UTA');
+  if (permissions.canTransfer) bits.push('Transfer');
+  if (permissions.canWithdraw) bits.push('Withdraw');
+  if (permissions.canExchange) bits.push('Exchange');
+  if (permissions.canEarnRead) bits.push('Earn');
+  if (permissions.canCard) bits.push('Card');
+  return bits.length ? bits.join(' · ') : 'Limited permissions';
 }

@@ -1,8 +1,8 @@
 import type { CryptoProvider } from '../domain/CryptoProvider';
 import type { ProviderType } from '../domain/types';
+import { createBybitProvider } from './bybit/BybitCryptoProvider';
 import {
   createMockBinanceProvider,
-  createMockBybitProvider,
   createMockNonCustodialProvider,
   MockCryptoProvider,
 } from './MockCryptoProvider';
@@ -18,7 +18,7 @@ export class ProviderRegistry {
   private factories = new Map<ProviderType, CryptoProvider>();
 
   constructor() {
-    this.factories.set('bybit', createMockBybitProvider());
+    this.factories.set('bybit', createBybitProvider());
     this.factories.set('binance', createMockBinanceProvider());
     this.factories.set('non_custodial', createMockNonCustodialProvider());
     this.factories.set('mock', new MockCryptoProvider('mock', 'Mock venue'));
