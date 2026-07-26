@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { formatQty } from '../components/Amount';
+import { formatAssetQty, formatQty } from '../components/Amount';
 import { AssetIcon, IconBack, IconChevronDown } from '../components/icons';
+import { balanceQuantity, isInsufficientBalance } from '../domain/balances';
 import type {
   OperationResult,
   SendPreview,
@@ -69,6 +70,19 @@ export function SendScreen() {
     );
   }, [accounts, selectedAccount]);
 
+  const availableQuantity = useMemo(
+    () => (accountId ? balanceQuantity(balances, accountId, asset) : 0),
+    [balances, accountId, asset],
+  );
+
+  const destinationAvailableQuantity = useMemo(() => {
+    if (kind !== 'internal' || !destinationAccountId) return null;
+    return balanceQuantity(balances, destinationAccountId, asset);
+  }, [kind, destinationAccountId, balances, asset]);
+
+  const qty = Number(quantity);
+  const insufficientBalance = isInsufficientBalance(qty, availableQuantity);
+
   useEffect(() => {
     if (!assetSymbols.includes(asset) && assetSymbols[0]) {
       setAsset(assetSymbols[0]);
@@ -118,9 +132,14 @@ export function SendScreen() {
 
   async function onContinue() {
     setError(null);
-    const qty = Number(quantity);
     if (!accountId || !(qty > 0)) {
       setError('Fill asset, account, and amount.');
+      return;
+    }
+    if (insufficientBalance) {
+      setError(
+        `Insufficient balance. Available ${formatAssetQty(asset, availableQuantity)} ${asset}.`,
+      );
       return;
     }
     if (fromProduct === 'EARN') {
@@ -330,7 +349,7 @@ export function SendScreen() {
         >
           {accountOptions.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.nickname}
+              {a.nickname} · {formatAssetQty(asset, balanceQuantity(balances, a.id, asset))} {asset}
             </option>
           ))}
         </select>
@@ -359,13 +378,19 @@ export function SendScreen() {
           >
             {siblingAccounts.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.nickname}
+                {a.nickname} · {formatAssetQty(asset, balanceQuantity(balances, a.id, asset))} {asset}
               </option>
             ))}
           </select>
           {siblingAccounts.length === 0 ? (
             <div className="notice notice--warning" style={{ marginTop: 8 }}>
               No sibling Funding/UTA account is connected for this key.
+            </div>
+          ) : destinationAvailableQuantity !== null ? (
+            <div className="field-balance">
+              <span className="field-balance__value tabular">
+                Receiver balance {formatAssetQty(asset, destinationAvailableQuantity)} {asset}
+              </span>
             </div>
           ) : null}
         </div>
@@ -410,9 +435,30 @@ export function SendScreen() {
           className="tabular"
           inputMode="decimal"
           value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
+          onChange={(e) => {
+            setQuantity(e.target.value);
+            setError(null);
+          }}
           placeholder="0.00"
         />
+        {accountId ? (
+          <div className="field-balance">
+            <span className="field-balance__value tabular">
+              Available {formatAssetQty(asset, availableQuantity)} {asset}
+            </span>
+            <button
+              type="button"
+              className="field-balance__max"
+              disabled={availableQuantity <= 0}
+              onClick={() => {
+                setQuantity(String(availableQuantity));
+                setError(null);
+              }}
+            >
+              Max
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {blockedByPermissions ? (
@@ -422,13 +468,22 @@ export function SendScreen() {
         </div>
       ) : null}
 
-      {error ? <div className="notice notice--danger">{error}</div> : null}
+      {insufficientBalance ? (
+        <div className="notice notice--danger">
+          Insufficient balance. Available {formatAssetQty(asset, availableQuantity)}{' '}
+          {asset}.
+        </div>
+      ) : null}
+
+      {error && !insufficientBalance ? (
+        <div className="notice notice--danger">{error}</div>
+      ) : null}
 
       <button
         type="button"
         className="btn btn--primary btn--block"
         onClick={() => void onContinue()}
-        disabled={busy || blockedByPermissions}
+        disabled={busy || blockedByPermissions || insufficientBalance}
       >
         Review
       </button>

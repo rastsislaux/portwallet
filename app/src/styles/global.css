@@ -1020,6 +1020,36 @@ img {
   width: 100%;
 }
 
+.field-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-caption);
+  line-height: 16px;
+  color: var(--ink-secondary);
+}
+
+.field-balance__value {
+  color: var(--ink-tertiary);
+}
+
+.field-balance__max {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.field-balance__max:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* ─── Exchange conversion widget ────────────────────────── */
 
 .conversion-widget {
@@ -1052,6 +1082,33 @@ img {
   color: var(--ink-quaternary);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.conversion-leg__balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 2px;
+  font-size: var(--text-caption);
+  line-height: 16px;
+  color: var(--ink-tertiary);
+}
+
+.conversion-leg__balance-max {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.conversion-leg__balance-max:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .conversion-leg__amount {
