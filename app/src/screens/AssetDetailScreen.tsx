@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { formatFiat, formatQty } from '../components/Amount';
+import { formatQty } from '../components/Amount';
 import {
   AssetIcon,
   IconBack,
@@ -9,12 +9,14 @@ import {
   ProviderIcon,
 } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
+import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
 export function AssetDetailScreen() {
   const { assetId } = useParams();
   const navigate = useNavigate();
   const { assets, balances, accounts, transactions } = useWallet();
+  const { formatFromUsd } = useSettings();
 
   const asset = assets.find((a) => a.assetId === assetId);
   if (!asset) {
@@ -50,7 +52,7 @@ export function AssetDetailScreen() {
             {formatQty(asset.quantity)} {asset.symbol}
           </div>
           <div className="portfolio-total__meta">
-            {formatFiat(asset.fiatValueUsd)} USD
+            {formatFromUsd(asset.fiatValueUsd)}
           </div>
         </div>
       </header>

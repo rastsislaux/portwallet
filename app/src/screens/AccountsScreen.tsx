@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ProviderIcon } from '../components/icons';
+import { Link } from 'react-router-dom';
+import { IconBack, ProviderIcon } from '../components/icons';
 import type { ProviderType } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
@@ -42,6 +43,11 @@ export function AccountsScreen() {
 
   return (
     <section className="screen">
+      <Link className="back-link" to="/settings">
+        <IconBack size={20} />
+        Settings
+      </Link>
+
       <header className="header-block">
         <h1 className="screen-title">Accounts</h1>
       </header>

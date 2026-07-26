@@ -135,6 +135,31 @@ img {
   gap: var(--space-4);
 }
 
+.brand-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-tertiary);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.icon-button:active {
+  background: var(--bg-fill);
+  color: var(--ink);
+}
+
 .brand-mark {
   font-size: var(--text-large);
   line-height: 1.05;
@@ -1701,4 +1726,103 @@ img {
 .empty--compact p {
   margin: 0;
 }
+
+/* ─── Settings ──────────────────────────────────────────── */
+
+.grouped-row--link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.grouped-row--link:active {
+  background: var(--bg-fill);
+}
+
+.grouped-row--field {
+  grid-template-columns: 1fr auto;
+}
+
+.grouped-row__chevron {
+  color: var(--ink-quaternary);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.currency-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+.currency-select__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-tertiary);
+  font-size: var(--text-body);
+  font-weight: 400;
+  pointer-events: none;
+}
+
+.currency-select select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.settings-rate-meta {
+  margin: 8px 4px 0;
+  font-size: var(--text-caption);
+  line-height: 1.35;
+  color: var(--ink-quaternary);
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  color: var(--accent-tint);
+  font: inherit;
+  padding: 0;
+  min-height: 0;
+}
+
+.settings-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 4px 0;
+}
+
+.settings-sources__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-sources__title {
+  font-size: var(--text-callout);
+  font-weight: 510;
+  letter-spacing: -0.01em;
+}
+
+.settings-sources__detail,
+.settings-sources__note {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  color: var(--ink-tertiary);
+}
+
+.settings-sources__note {
+  color: var(--ink-quaternary);
+  padding-top: 4px;
+}
+
 

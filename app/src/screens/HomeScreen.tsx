@@ -1,17 +1,19 @@
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
-import { formatAssetQty, formatFiat, formatFiatParts, formatQty } from '../components/Amount';
-import { AssetIcon, IconExchange, IconReceive, IconSend } from '../components/icons';
+import { formatAssetQty, formatQty } from '../components/Amount';
+import { AssetIcon, IconExchange, IconReceive, IconSend, IconSettings } from '../components/icons';
+import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
 export function HomeScreen() {
   const { ready, assets, totalFiatUsd, custodySummary, accounts } = useWallet();
+  const { displayCurrency, formatFromUsd, formatFromUsdParts } = useSettings();
 
   const btc = assets.find((a) => a.symbol === 'BTC');
   const btcApprox = btc
     ? formatQty(totalFiatUsd / (btc.fiatValueUsd / btc.quantity || 68420), 4)
     : formatQty(totalFiatUsd / 68420, 4);
-  const balance = formatFiatParts(totalFiatUsd);
+  const balance = formatFromUsdParts(totalFiatUsd);
 
   if (!ready) {
     return (
@@ -29,7 +31,17 @@ export function HomeScreen() {
       <header className="header-block">
         <div className="brand-header">
           <div className="brand-mark">Portwallet</div>
-          <AccountFilter />
+          <div className="brand-header__actions">
+            <AccountFilter />
+            <Link
+              to="/settings"
+              className="icon-button"
+              aria-label="Settings"
+              title="Settings"
+            >
+              <IconSettings size={20} strokeWidth={1.75} />
+            </Link>
+          </div>
         </div>
         <p className="custody-strip">{custodySummary}</p>
       </header>
@@ -46,13 +58,13 @@ export function HomeScreen() {
           <div className="portfolio-total">
             <div
               className="portfolio-total__value tabular"
-              aria-label={`${balance.integer}.${balance.decimal} USD`}
+              aria-label={`${balance.integer}.${balance.decimal} ${displayCurrency}`}
             >
               <span className="portfolio-total__int">{balance.integer}</span>
               <span className="portfolio-total__dec">.{balance.decimal}</span>
             </div>
             <div className="portfolio-total__meta">
-              USD ≈ {btcApprox} BTC
+              {displayCurrency} ≈ {btcApprox} BTC
             </div>
           </div>
 
@@ -89,7 +101,7 @@ export function HomeScreen() {
                   </span>
                   <span className="asset-row__name">{asset.name}</span>
                   <span className="asset-row__fiat tabular">
-                    {formatFiat(asset.fiatValueUsd)} USD
+                    {formatFromUsd(asset.fiatValueUsd)}
                   </span>
                 </Link>
               ))}

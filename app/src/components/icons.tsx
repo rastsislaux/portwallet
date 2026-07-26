@@ -11,6 +11,7 @@ import {
   CreditCard,
   Home,
   Repeat2,
+  Settings,
   WalletCards,
   type LucideProps,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ export const IconActivity = withDefaults(Activity);
 export const IconCards = withDefaults(CreditCard);
 export const IconExchange = withDefaults(Repeat2);
 export const IconAccounts = withDefaults(WalletCards);
+export const IconSettings = withDefaults(Settings);
 export const IconSend = withDefaults(ArrowUpRight);
 export const IconReceive = withDefaults(ArrowDown);
 export const IconChevronDown = withDefaults(ChevronDown);
