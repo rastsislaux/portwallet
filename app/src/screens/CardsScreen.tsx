@@ -4,6 +4,7 @@ import { formatFiat, formatQty } from '../components/Amount';
 import { PaymentCard } from '../components/PaymentCard';
 import { StatusBadge } from '../components/StatusBadge';
 import type { CardOperation, ProviderCard } from '../domain/types';
+import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
 export function CardsScreen() {
@@ -158,6 +159,7 @@ function CardDetail({
   funding: ReturnType<typeof useWallet>['fundingByAccountId'][string];
   operations: CardOperation[];
 }) {
+  const { formatFromUsd } = useSettings();
   const eligibleFunding = funding.filter((f) => f.cardEligible);
 
   return (
@@ -181,7 +183,7 @@ function CardDetail({
                 <span>{asset.symbol}</span>
                 <span className="tabular">
                   {formatQty(asset.quantity, asset.symbol === 'USDT' || asset.symbol === 'USDC' ? 2 : 8)} ·{' '}
-                  {formatFiat(asset.fiatValueUsd)} USD
+                  {formatFromUsd(asset.fiatValueUsd)}
                 </span>
               </div>
             ))}
