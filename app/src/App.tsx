@@ -12,7 +12,7 @@ import { WalletProvider } from './state/WalletContext';
 export default function App() {
   return (
     <WalletProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<HomeScreen />} />

@@ -30,3 +30,11 @@ npm run build
 ```
 
 Prototype boots with two mock Bybit accounts so multi-account aggregation is visible immediately. Add Binance or a non-custodial wallet from **Accounts**.
+
+## Deploy
+
+Pushes to `main` build the Vite app and publish it to GitHub Pages via [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
+
+Site: https://rastsislaux.github.io/portwallet/
+
+If Pages is not live yet, open **Settings → Pages → Build and deployment**, set **Source** to **GitHub Actions**, then re-run the **Deploy GitHub Pages** workflow.
