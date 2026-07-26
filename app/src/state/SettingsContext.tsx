@@ -16,7 +16,12 @@ import {
 import { FX_DATA_SOURCES, fetchUsdToQuote, type FxQuote } from '../fx/rates';
 import { formatFiat, formatFiatParts } from '../components/Amount';
 
-const STORAGE_KEY = 'portwallet.mainCurrency';
+const STORAGE_MAIN_CURRENCY = 'portwallet.mainCurrency';
+const STORAGE_HIDE_BELOW_ENABLED = 'portwallet.hideBelowThreshold.enabled';
+const STORAGE_HIDE_BELOW_AMOUNT = 'portwallet.hideBelowThreshold.amount';
+const STORAGE_HIDE_BELOW_CURRENCY = 'portwallet.hideBelowThreshold.currency';
+
+const DEFAULT_HIDE_BELOW_AMOUNT = 1;
 
 type RateStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -34,35 +39,119 @@ type SettingsContextValue = {
   rateError: string | null;
   refreshRate: () => Promise<void>;
   dataSources: typeof FX_DATA_SOURCES;
+  hideBelowThresholdEnabled: boolean;
+  hideBelowThresholdAmount: number;
+  hideBelowThresholdCurrency: string;
+  setHideBelowThresholdEnabled: (enabled: boolean) => void;
+  setHideBelowThresholdAmount: (amount: number) => void;
+  setHideBelowThresholdCurrency: (code: string) => void;
+  /** USD value to compare against; null when filtering is inactive. */
+  hideBelowThresholdUsd: number | null;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-function readStoredCurrency(): string {
+function readStoredCurrency(key: string, fallback: string): string {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(key);
     if (stored && getCurrency(stored)) return stored;
   } catch {
     /* ignore */
   }
-  return DEFAULT_MAIN_CURRENCY;
+  return fallback;
+}
+
+function readStoredBool(key: string, fallback: boolean): boolean {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+function readStoredAmount(key: string, fallback: number): number {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored == null) return fallback;
+    const n = Number(stored);
+    if (Number.isFinite(n) && n >= 0) return n;
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+function writeStorage(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+function usdIdentityQuote(): FxQuote {
+  return {
+    base: 'USD',
+    quote: 'USD',
+    rate: 1,
+    date: new Date().toISOString().slice(0, 10),
+    source: 'identity',
+    sourceLabel: '—',
+  };
+}
+
+function resolveActiveQuote(currency: string, quote: FxQuote | null): FxQuote | null {
+  if (currency === 'USD') {
+    return quote?.quote === 'USD' ? quote : usdIdentityQuote();
+  }
+  return quote?.quote === currency ? quote : null;
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [mainCurrency, setMainCurrencyState] = useState(readStoredCurrency);
+  const [mainCurrency, setMainCurrencyState] = useState(() =>
+    readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY),
+  );
   const [rateQuote, setRateQuote] = useState<FxQuote | null>(null);
   const [rateStatus, setRateStatus] = useState<RateStatus>('idle');
   const [rateError, setRateError] = useState<string | null>(null);
+
+  const [hideBelowThresholdEnabled, setHideBelowEnabledState] = useState(() =>
+    readStoredBool(STORAGE_HIDE_BELOW_ENABLED, false),
+  );
+  const [hideBelowThresholdAmount, setHideBelowAmountState] = useState(() =>
+    readStoredAmount(STORAGE_HIDE_BELOW_AMOUNT, DEFAULT_HIDE_BELOW_AMOUNT),
+  );
+  const [hideBelowThresholdCurrency, setHideBelowCurrencyState] = useState(() =>
+    readStoredCurrency(STORAGE_HIDE_BELOW_CURRENCY, readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY)),
+  );
+  const [thresholdRateQuote, setThresholdRateQuote] = useState<FxQuote | null>(null);
 
   const setMainCurrency = useCallback((code: string) => {
     const next = code.toUpperCase();
     if (!getCurrency(next)) return;
     setMainCurrencyState(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      /* ignore */
-    }
+    writeStorage(STORAGE_MAIN_CURRENCY, next);
+  }, []);
+
+  const setHideBelowThresholdEnabled = useCallback((enabled: boolean) => {
+    setHideBelowEnabledState(enabled);
+    writeStorage(STORAGE_HIDE_BELOW_ENABLED, String(enabled));
+  }, []);
+
+  const setHideBelowThresholdAmount = useCallback((amount: number) => {
+    const next = Number.isFinite(amount) && amount >= 0 ? amount : 0;
+    setHideBelowAmountState(next);
+    writeStorage(STORAGE_HIDE_BELOW_AMOUNT, String(next));
+  }, []);
+
+  const setHideBelowThresholdCurrency = useCallback((code: string) => {
+    const next = code.toUpperCase();
+    if (!getCurrency(next)) return;
+    setHideBelowCurrencyState(next);
+    writeStorage(STORAGE_HIDE_BELOW_CURRENCY, next);
   }, []);
 
   const refreshRate = useCallback(async () => {
@@ -83,24 +172,48 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     void refreshRate();
   }, [refreshRate]);
 
-  const activeQuote =
-    mainCurrency === 'USD'
-      ? rateQuote?.quote === 'USD'
-        ? rateQuote
-        : ({
-            base: 'USD',
-            quote: 'USD',
-            rate: 1,
-            date: new Date().toISOString().slice(0, 10),
-            source: 'identity',
-            sourceLabel: '—',
-          } satisfies FxQuote)
-      : rateQuote?.quote === mainCurrency
-        ? rateQuote
-        : null;
+  useEffect(() => {
+    let cancelled = false;
 
+    if (hideBelowThresholdCurrency === mainCurrency) {
+      setThresholdRateQuote(null);
+      return;
+    }
+
+    if (hideBelowThresholdCurrency === 'USD') {
+      setThresholdRateQuote(usdIdentityQuote());
+      return;
+    }
+
+    void fetchUsdToQuote(hideBelowThresholdCurrency)
+      .then((quote) => {
+        if (!cancelled) setThresholdRateQuote(quote);
+      })
+      .catch(() => {
+        if (!cancelled) setThresholdRateQuote(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hideBelowThresholdCurrency, mainCurrency]);
+
+  const activeQuote = resolveActiveQuote(mainCurrency, rateQuote);
   const usdToMainRate = activeQuote?.rate ?? 1;
   const displayCurrency = activeQuote?.quote ?? 'USD';
+
+  const thresholdQuote =
+    hideBelowThresholdCurrency === mainCurrency
+      ? activeQuote
+      : resolveActiveQuote(hideBelowThresholdCurrency, thresholdRateQuote);
+
+  const hideBelowThresholdUsd = useMemo(() => {
+    if (!hideBelowThresholdEnabled) return null;
+    if (!Number.isFinite(hideBelowThresholdAmount) || hideBelowThresholdAmount <= 0) return null;
+    const rate = thresholdQuote?.rate;
+    if (!rate || rate <= 0) return null;
+    return hideBelowThresholdAmount / rate;
+  }, [hideBelowThresholdEnabled, hideBelowThresholdAmount, thresholdQuote]);
 
   const convertFromUsd = useCallback(
     (usdAmount: number) => usdAmount * usdToMainRate,
@@ -132,6 +245,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       rateError,
       refreshRate,
       dataSources: FX_DATA_SOURCES,
+      hideBelowThresholdEnabled,
+      hideBelowThresholdAmount,
+      hideBelowThresholdCurrency,
+      setHideBelowThresholdEnabled,
+      setHideBelowThresholdAmount,
+      setHideBelowThresholdCurrency,
+      hideBelowThresholdUsd,
     }),
     [
       mainCurrency,
@@ -145,6 +265,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       activeQuote,
       rateError,
       refreshRate,
+      hideBelowThresholdEnabled,
+      hideBelowThresholdAmount,
+      hideBelowThresholdCurrency,
+      setHideBelowThresholdEnabled,
+      setHideBelowThresholdAmount,
+      setHideBelowThresholdCurrency,
+      hideBelowThresholdUsd,
     ],
   );
 

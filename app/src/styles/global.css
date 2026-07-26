@@ -1742,6 +1742,11 @@ img {
   grid-template-columns: 1fr auto;
 }
 
+.grouped-row--field + .grouped-row::before,
+.grouped-row + .grouped-row--field::before {
+  left: 16px;
+}
+
 .grouped-row__chevron {
   color: var(--ink-quaternary);
   font-size: 22px;
@@ -1779,6 +1784,91 @@ img {
 
 .settings-rate-meta {
   margin: 8px 4px 0;
+  font-size: var(--text-caption);
+  line-height: 1.35;
+  color: var(--ink-quaternary);
+}
+
+.settings-switch {
+  position: relative;
+  display: inline-flex;
+  width: 51px;
+  height: 31px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.settings-switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.settings-switch__track {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-fill-strong);
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.settings-switch__track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.settings-switch input:checked + .settings-switch__track {
+  background: var(--success);
+}
+
+.settings-switch input:checked + .settings-switch__track::after {
+  transform: translateX(20px);
+}
+
+.settings-switch input:focus-visible + .settings-switch__track {
+  box-shadow: 0 0 0 3px var(--accent-tint-soft);
+}
+
+.threshold-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.threshold-input input {
+  width: 88px;
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-fill);
+  padding: 0 10px;
+  text-align: right;
+  font-size: var(--text-body);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.threshold-input input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-tint-soft);
+}
+
+.asset-list__hidden-note {
+  margin: 10px 4px 0;
   font-size: var(--text-caption);
   line-height: 1.35;
   color: var(--ink-quaternary);

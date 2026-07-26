@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconAccounts, IconBack, IconChevronDown } from '../components/icons';
 import { useSettings } from '../state/SettingsContext';
@@ -12,9 +13,24 @@ export function SettingsScreen() {
     rateError,
     refreshRate,
     dataSources,
+    hideBelowThresholdEnabled,
+    hideBelowThresholdAmount,
+    hideBelowThresholdCurrency,
+    setHideBelowThresholdEnabled,
+    setHideBelowThresholdAmount,
+    setHideBelowThresholdCurrency,
   } = useSettings();
 
   const selected = currencies.find((c) => c.code === mainCurrency);
+  const [amountText, setAmountText] = useState(() => String(hideBelowThresholdAmount));
+
+  useEffect(() => {
+    setAmountText((prev) => {
+      const parsed = Number(prev);
+      if (Number.isFinite(parsed) && parsed === hideBelowThresholdAmount) return prev;
+      return String(hideBelowThresholdAmount);
+    });
+  }, [hideBelowThresholdAmount]);
 
   return (
     <section className="screen">
@@ -55,6 +71,77 @@ export function SettingsScreen() {
               </select>
             </div>
           </div>
+
+          <div className="grouped-row grouped-row--field">
+            <div className="grouped-row__body">
+              <div className="grouped-row__title">Hide small assets</div>
+              <div className="grouped-row__meta">
+                Hide assets below a value threshold
+              </div>
+            </div>
+            <label className="settings-switch">
+              <input
+                type="checkbox"
+                checked={hideBelowThresholdEnabled}
+                onChange={(e) => setHideBelowThresholdEnabled(e.target.checked)}
+                aria-label="Hide small assets"
+              />
+              <span className="settings-switch__track" aria-hidden="true" />
+            </label>
+          </div>
+
+          {hideBelowThresholdEnabled ? (
+            <div className="grouped-row grouped-row--field">
+              <div className="grouped-row__body">
+                <div className="grouped-row__title">Minimum value</div>
+                <div className="grouped-row__meta">
+                  Assets worth less than this are hidden
+                </div>
+              </div>
+              <div className="threshold-input">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  aria-label="Minimum asset value"
+                  value={amountText}
+                  onChange={(e) => {
+                    const raw = e.target.value.trim();
+                    if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                      setAmountText(raw);
+                      if (raw === '' || raw === '.') {
+                        setHideBelowThresholdAmount(0);
+                        return;
+                      }
+                      const n = Number(raw);
+                      if (Number.isFinite(n) && n >= 0) {
+                        setHideBelowThresholdAmount(n);
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    setAmountText(String(hideBelowThresholdAmount));
+                  }}
+                />
+                <div className="currency-select">
+                  <span className="currency-select__value">
+                    {hideBelowThresholdCurrency}
+                    <IconChevronDown size={14} strokeWidth={2} />
+                  </span>
+                  <select
+                    aria-label="Threshold currency"
+                    value={hideBelowThresholdCurrency}
+                    onChange={(e) => setHideBelowThresholdCurrency(e.target.value)}
+                  >
+                    {currencies.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code} — {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <p className="settings-rate-meta">
