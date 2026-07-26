@@ -49,22 +49,23 @@ export function AccountsScreen() {
         </p>
       </header>
 
-      <div className="account-list account-list--cards">
+      <div className="grouped-list">
         {accounts.map((account) => (
-          <div key={account.id} className="account-card">
-            <ProviderIcon type={account.providerType} size={44} />
-            <div className="account-card__body">
-              <div className="account-card__title">{account.nickname}</div>
-              <div className="account-card__meta">
-                {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
+          <div key={account.id} className="grouped-row">
+            <ProviderIcon type={account.providerType} size={36} />
+            <div className="grouped-row__body">
+              <div className="grouped-row__title">{account.nickname}</div>
+              <div className="grouped-row__meta">
                 {account.venueLabel}
+                {' · '}
+                {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'}
               </div>
             </div>
-            <div className="account-card__aside">
-              <span className="account-card__state">Connected</span>
+            <div className="grouped-row__aside">
+              <span className="connection-dot">Connected</span>
               <button
                 type="button"
-                className="filter-button filter-button--quiet"
+                className="grouped-row__action"
                 onClick={() => setConfirmRemoveId(account.id)}
               >
                 Remove
@@ -74,36 +75,44 @@ export function AccountsScreen() {
         ))}
       </div>
 
-      <button type="button" className="btn btn--block btn--soft" onClick={() => setAdding(true)}>
-        + Add account
+      <button
+        type="button"
+        className="btn btn--block btn--soft add-account-btn"
+        onClick={() => setAdding(true)}
+      >
+        Add account
       </button>
 
       {adding ? (
         <div className="sheet-backdrop" role="dialog" aria-modal="true">
           <div className="sheet">
-            <h2 className="screen-title" style={{ fontSize: 22 }}>
-              Add account
-            </h2>
+            <h2 className="screen-title screen-title--sheet">Add account</h2>
             <div className="field">
               <label htmlFor="provider-type">Provider</label>
-              <select
-                id="provider-type"
-                value={type}
-                onChange={(e) => setType(e.target.value as ProviderType)}
-              >
-                {availableProviderTypes.map((p) => (
-                  <option key={p.type} value={p.type}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <ProviderIcon type={type} size={40} />
-              <div className="notice notice--warning" style={{ flex: 1, margin: 0 }}>
-                {selectedType?.custodyLabel}. Assets stay with this provider — Portwallet
-                does not take custody.
+              <div className="asset-select">
+                <ProviderIcon type={type} size={28} />
+                <span className="asset-select__label">
+                  {availableProviderTypes.find((p) => p.type === type)?.label}
+                </span>
+                <span className="asset-select__chevron" aria-hidden="true">
+                  ▾
+                </span>
+                <select
+                  id="provider-type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as ProviderType)}
+                >
+                  {availableProviderTypes.map((p) => (
+                    <option key={p.type} value={p.type}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+            <div className="notice notice--warning" style={{ margin: 0 }}>
+              {selectedType?.custodyLabel}. Assets stay with this provider — Portwallet
+              does not take custody.
             </div>
             <div className="field">
               <label htmlFor="nickname">Nickname</label>
@@ -123,7 +132,7 @@ export function AccountsScreen() {
             <div className="stack-actions">
               <button
                 type="button"
-                className="btn"
+                className="btn btn--ghost"
                 onClick={() => setAdding(false)}
                 disabled={busy}
               >
@@ -145,17 +154,15 @@ export function AccountsScreen() {
       {confirmRemoveId ? (
         <div className="sheet-backdrop" role="dialog" aria-modal="true">
           <div className="sheet">
-            <h2 className="screen-title" style={{ fontSize: 22 }}>
-              Remove account?
-            </h2>
-            <p style={{ margin: 0, color: 'var(--ink-secondary)' }}>
+            <h2 className="screen-title screen-title--sheet">Remove account?</h2>
+            <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: 15, lineHeight: 1.4 }}>
               This only disconnects the account from Portwallet. Funds remain with the
               provider.
             </p>
             <div className="stack-actions">
               <button
                 type="button"
-                className="btn"
+                className="btn btn--ghost"
                 onClick={() => setConfirmRemoveId(null)}
                 disabled={busy}
               >

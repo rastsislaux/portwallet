@@ -29,8 +29,8 @@ export function AppShell() {
               end={tab.end}
               className={({ isActive }) => (isActive ? 'is-active' : undefined)}
             >
-              <Icon size={22} />
-              {tab.label}
+              <Icon size={24} strokeWidth={1.75} />
+              <span>{tab.label}</span>
             </NavLink>
           );
         })}

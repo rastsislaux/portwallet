@@ -22,9 +22,6 @@ export function ActivityScreen() {
     <section className="screen">
       <header className="header-block">
         <h1 className="screen-title">Activity</h1>
-        <p className="custody-strip" style={{ marginTop: 0 }}>
-          Transfers, internal moves, withdrawals, and exchanges.
-        </p>
       </header>
 
       <div className="segmented" role="tablist" aria-label="Status filter">

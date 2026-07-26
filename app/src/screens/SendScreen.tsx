@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
-import { AssetIcon, IconBack } from '../components/icons';
+import { AssetIcon, IconBack, IconChevronDown } from '../components/icons';
 import type {
   OperationResult,
   SendPreview,
@@ -132,7 +132,7 @@ export function SendScreen() {
           <Link className="btn btn--primary" to="/activity">
             View activity
           </Link>
-          <button type="button" className="btn" onClick={() => navigate('/')}>
+          <button type="button" className="btn btn--ghost" onClick={() => navigate('/')}>
             Back to home
           </button>
         </div>
@@ -144,7 +144,7 @@ export function SendScreen() {
     return (
       <section className="screen">
         <button type="button" className="back-link" onClick={() => setStep('form')}>
-          <IconBack />
+          <IconBack size={20} />
           Edit
         </button>
         <h1 className="screen-title">Review send</h1>
@@ -161,7 +161,7 @@ export function SendScreen() {
 
         <div className="section-block">
           <div className="section-label">To</div>
-          <div style={{ wordBreak: 'break-all' }}>{preview.request.destination}</div>
+          <div style={{ wordBreak: 'break-all', fontSize: 15 }}>{preview.request.destination}</div>
           <div className="muted" style={{ fontSize: 13 }}>
             {preview.networkName} · {labelKind(preview.request.kind)}
           </div>
@@ -198,7 +198,7 @@ export function SendScreen() {
         )}
 
         <div className="stack-actions">
-          <button type="button" className="btn" onClick={() => setStep('form')} disabled={busy}>
+          <button type="button" className="btn btn--ghost" onClick={() => setStep('form')} disabled={busy}>
             Cancel
           </button>
           <button
@@ -217,7 +217,7 @@ export function SendScreen() {
   return (
     <section className="screen">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
-        <IconBack />
+        <IconBack size={20} />
         Back
       </button>
       <h1 className="screen-title">Send</h1>
@@ -226,6 +226,10 @@ export function SendScreen() {
         <label htmlFor="send-asset">Asset</label>
         <div className="asset-select">
           <AssetIcon symbol={asset} size={28} />
+          <span className="asset-select__label">{asset}</span>
+          <span className="asset-select__chevron">
+            <IconChevronDown size={16} />
+          </span>
           <select
             id="send-asset"
             value={asset}

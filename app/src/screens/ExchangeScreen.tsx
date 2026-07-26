@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
-import { AssetIcon, IconArrowDown, IconBack } from '../components/icons';
+import {
+  AssetIcon,
+  IconChevronDown,
+  IconSwap,
+  ProviderIcon,
+} from '../components/icons';
 import type { ExchangeQuote, OperationResult } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
-type Step = 'form' | 'review' | 'result';
+type Step = 'form' | 'result';
 
 export function ExchangeScreen() {
   const [params] = useSearchParams();
@@ -30,6 +35,7 @@ export function ExchangeScreen() {
   const [result, setResult] = useState<OperationResult | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quoting, setQuoting] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const accountOptions = useMemo(
@@ -39,6 +45,8 @@ export function ExchangeScreen() {
       ),
     [accounts, balances, fromSymbol],
   );
+
+  const selectedAccount = accounts.find((a) => a.id === accountId);
 
   useEffect(() => {
     if (!assetSymbols.includes(fromSymbol) && assetSymbols[0]) {
@@ -58,46 +66,56 @@ export function ExchangeScreen() {
     }
   }, [accountId, accountOptions]);
 
-  async function onQuote() {
-    setError(null);
+  useEffect(() => {
     const qty = Number(quantity);
     if (!accountId || !(qty > 0) || fromSymbol === toSymbol) {
-      setError('Choose different assets and a valid amount.');
+      setQuote(null);
+      setError(
+        fromSymbol === toSymbol ? 'Choose different assets.' : null,
+      );
+      setQuoting(false);
       return;
     }
-    setBusy(true);
-    try {
-      const q = await prepareExchange({
-        accountId,
-        fromSymbol,
-        toSymbol,
-        fromQuantity: qty,
-      });
-      setQuote(q);
-    } catch (e) {
-      setQuote(null);
-      setError(e instanceof Error ? e.message : 'Quote unavailable');
-    } finally {
-      setBusy(false);
-    }
-  }
 
-  async function onReview() {
+    let cancelled = false;
+    setQuoting(true);
     setError(null);
-    setBusy(true);
-    try {
-      const q = await prepareExchange({
-        accountId,
-        fromSymbol,
-        toSymbol,
-        fromQuantity: Number(quantity),
-      });
-      setQuote(q);
-      setStep('review');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Quote unavailable');
-    } finally {
-      setBusy(false);
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const q = await prepareExchange({
+            accountId,
+            fromSymbol,
+            toSymbol,
+            fromQuantity: qty,
+          });
+          if (!cancelled) {
+            setQuote(q);
+            setError(null);
+          }
+        } catch (e) {
+          if (!cancelled) {
+            setQuote(null);
+            setError(e instanceof Error ? e.message : 'Quote unavailable');
+          }
+        } finally {
+          if (!cancelled) setQuoting(false);
+        }
+      })();
+    }, 280);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [accountId, fromSymbol, toSymbol, quantity, prepareExchange]);
+
+  function swapAssets() {
+    setFromSymbol(toSymbol);
+    setToSymbol(fromSymbol);
+    if (quote) {
+      setQuantity(String(quote.youReceiveQuantity));
     }
   }
 
@@ -126,7 +144,14 @@ export function ExchangeScreen() {
           <Link className="btn btn--primary" to="/activity">
             View activity
           </Link>
-          <button type="button" className="btn" onClick={() => setStep('form')}>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => {
+              setStep('form');
+              setResult(null);
+            }}
+          >
             Exchange again
           </button>
         </div>
@@ -134,211 +159,175 @@ export function ExchangeScreen() {
     );
   }
 
-  if (step === 'review' && quote) {
-    return (
-      <section className="screen">
-        <button type="button" className="back-link" onClick={() => setStep('form')}>
-          <IconBack />
-          Edit
-        </button>
-        <h1 className="screen-title">Review exchange</h1>
-
-        <div className="conversion-hero">
-          <div className="conversion-hero__asset">
-            <AssetIcon symbol={quote.request.fromSymbol} size={52} />
-            <span className="tabular">
-              {formatQty(quote.request.fromQuantity)} {quote.request.fromSymbol}
-            </span>
-          </div>
-          <div className="conversion-hero__arrow">
-            <IconArrowDown size={18} />
-          </div>
-          <div className="conversion-hero__asset">
-            <AssetIcon symbol={quote.request.toSymbol} size={52} />
-            <span className="tabular">
-              {formatQty(quote.youReceiveQuantity)} {quote.request.toSymbol}
-            </span>
-          </div>
-        </div>
-
-        <div className="review-block">
-          <div className="review-row">
-            <span>Rate</span>
-            <span>{quote.rateLabel}</span>
-          </div>
-          <div className="review-row">
-            <span>Fee</span>
-            <span className="tabular">
-              {formatQty(quote.feeQuantity)} {quote.feeAssetSymbol}
-            </span>
-          </div>
-          <div className="review-row">
-            <span>Via</span>
-            <span>{quote.providerLabel}</span>
-          </div>
-        </div>
-
-        <div className="notice notice--warning">
-          Quoted amounts can change if the market moves. Confirm only if the receive
-          amount is acceptable.
-        </div>
-
-        <div className="stack-actions">
-          <button type="button" className="btn" onClick={() => setStep('form')} disabled={busy}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => void onConfirm()}
-            disabled={busy}
-          >
-            Confirm exchange
-          </button>
-        </div>
-      </section>
-    );
-  }
+  const receiveLabel = quote
+    ? formatQty(quote.youReceiveQuantity)
+    : quoting
+      ? '…'
+      : '0';
 
   return (
-    <section className="screen">
+    <section className="screen screen--exchange">
       <header className="header-block">
         <h1 className="screen-title">Exchange</h1>
-        <p className="custody-strip" style={{ marginTop: 0 }}>
-          Convert within a connected account. Fees and final amount shown before confirm.
-        </p>
       </header>
 
-      <div className="conversion-hero">
-        <div className="conversion-hero__asset">
-          <AssetIcon symbol={fromSymbol} size={52} />
-          <span>{fromSymbol}</span>
-        </div>
-        <div className="conversion-hero__arrow">
-          <IconArrowDown size={18} />
-        </div>
-        <div className="conversion-hero__asset">
-          <AssetIcon symbol={toSymbol} size={52} />
-          <span>{toSymbol}</span>
-        </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="ex-account">Account</label>
-        <select
-          id="ex-account"
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-        >
-          {accountOptions.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nickname}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="field">
-        <label htmlFor="ex-from">From</label>
-        <div className="field-row">
+      {accountOptions.length > 0 ? (
+        <div className="account-chip" style={{ alignSelf: 'flex-start' }}>
+          {selectedAccount ? (
+            <ProviderIcon type={selectedAccount.providerType} size={28} />
+          ) : null}
+          <span className="account-chip__label">
+            {selectedAccount?.nickname ?? 'Account'}
+          </span>
+          <IconChevronDown size={14} className="account-chip__chevron" />
           <select
-            id="ex-from"
-            value={fromSymbol}
-            onChange={(e) => {
-              setFromSymbol(e.target.value);
-              setQuote(null);
-            }}
+            aria-label="Account"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
           >
-            {assetSymbols.map((s) => (
-              <option key={s} value={s}>
-                {s}
+            {accountOptions.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nickname}
               </option>
             ))}
           </select>
-          <input
-            className="tabular"
-            inputMode="decimal"
-            value={quantity}
-            onChange={(e) => {
-              setQuantity(e.target.value);
-              setQuote(null);
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="ex-to">To</label>
-        <select
-          id="ex-to"
-          value={toSymbol}
-          onChange={(e) => {
-            setToSymbol(e.target.value);
-            setQuote(null);
-          }}
-        >
-          {assetSymbols.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {quote ? (
-        <div className="review-block">
-          <div className="review-row">
-            <span>Rate</span>
-            <span>{quote.rateLabel}</span>
-          </div>
-          <div className="review-row">
-            <span>Fee</span>
-            <span className="tabular">
-              {formatQty(quote.feeQuantity)} {quote.feeAssetSymbol}
-            </span>
-          </div>
-          <div className="review-row review-row--emphasis">
-            <span>You receive</span>
-            <span className="tabular">
-              {formatQty(quote.youReceiveQuantity)} {quote.request.toSymbol}
-            </span>
-          </div>
-          <div className="review-row">
-            <span>Via</span>
-            <span>{quote.providerLabel}</span>
-          </div>
-        </div>
-      ) : (
-        <button type="button" className="btn btn--block btn--soft" onClick={() => void onQuote()} disabled={busy}>
-          Get quote
-        </button>
-      )}
-
-      <button
-        type="button"
-        className="details-toggle"
-        onClick={() => setShowDetails((v) => !v)}
-      >
-        {showDetails ? '▾' : '▸'} Details (spread, min amount)
-      </button>
-      {showDetails && quote ? (
-        <div className="details-panel">
-          <div>Spread: {quote.spreadBps} bps</div>
-          <div>
-            Minimum: {formatQty(quote.minFromQuantity)} {quote.request.fromSymbol}
-          </div>
         </div>
       ) : null}
 
-      {error ? <div className="notice notice--danger">{error}</div> : null}
+      <div className="conversion-widget">
+        <div className="conversion-leg">
+          <div className="conversion-leg__top">
+            <span className="conversion-leg__hint">You pay</span>
+            <label className="selector">
+              <AssetIcon symbol={fromSymbol} size={28} />
+              <span className="selector__ticker">{fromSymbol}</span>
+              <span className="selector__chevron">
+                <IconChevronDown size={14} />
+              </span>
+              <select
+                aria-label="From asset"
+                value={fromSymbol}
+                onChange={(e) => setFromSymbol(e.target.value)}
+              >
+                {assetSymbols.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <input
+            className="conversion-leg__amount tabular"
+            inputMode="decimal"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            placeholder="0"
+            aria-label="Amount to exchange"
+          />
+        </div>
+
+        <div className="conversion-swap">
+          <button
+            type="button"
+            className="btn btn--swap"
+            onClick={swapAssets}
+            aria-label="Swap assets"
+          >
+            <IconSwap size={16} strokeWidth={2.25} />
+          </button>
+        </div>
+
+        <div className="conversion-divider" />
+
+        <div className="conversion-leg">
+          <div className="conversion-leg__top">
+            <span className="conversion-leg__hint">You receive</span>
+            <label className="selector">
+              <AssetIcon symbol={toSymbol} size={28} />
+              <span className="selector__ticker">{toSymbol}</span>
+              <span className="selector__chevron">
+                <IconChevronDown size={14} />
+              </span>
+              <select
+                aria-label="To asset"
+                value={toSymbol}
+                onChange={(e) => setToSymbol(e.target.value)}
+              >
+                {assetSymbols.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div
+            className={`conversion-leg__receive tabular ${quote ? '' : 'is-muted'}`}
+            aria-live="polite"
+          >
+            {receiveLabel}
+          </div>
+        </div>
+      </div>
+
+      <div className="quote-inline">
+        {quote ? (
+          <>
+            <div className="quote-inline__row quote-inline__row--primary">
+              <span>Rate</span>
+              <span>{quote.rateLabel}</span>
+            </div>
+            <div className="quote-inline__row">
+              <span>Fee</span>
+              <span className="tabular">
+                {formatQty(quote.feeQuantity)} {quote.feeAssetSymbol}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="details-toggle"
+              onClick={() => setShowDetails((v) => !v)}
+            >
+              {showDetails ? 'Hide details' : 'Details'}
+            </button>
+            {showDetails ? (
+              <div className="details-panel">
+                <div className="quote-inline__row">
+                  <span>Spread</span>
+                  <span>{quote.spreadBps} bps</span>
+                </div>
+                <div className="quote-inline__row">
+                  <span>Minimum</span>
+                  <span className="tabular">
+                    {formatQty(quote.minFromQuantity)} {quote.request.fromSymbol}
+                  </span>
+                </div>
+                <div className="quote-inline__row">
+                  <span>Via</span>
+                  <span>{quote.providerLabel}</span>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="quote-status">
+            {quoting ? 'Updating quote…' : error ?? 'Enter an amount to see your quote'}
+          </div>
+        )}
+      </div>
+
+      {error && quote === null && !quoting ? (
+        <div className="notice notice--danger">{error}</div>
+      ) : null}
 
       <button
         type="button"
-        className="btn btn--primary btn--block"
-        onClick={() => void onReview()}
-        disabled={busy}
+        className="btn btn--primary btn--block exchange-confirm"
+        onClick={() => void onConfirm()}
+        disabled={busy || !quote || quoting}
       >
-        Review exchange
+        Confirm exchange
       </button>
     </section>
   );

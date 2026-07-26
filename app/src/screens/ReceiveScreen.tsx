@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AssetIcon, IconBack, IconCopy } from '../components/icons';
+import { AssetIcon, IconBack, IconChevronDown, IconCopy } from '../components/icons';
 import type { ReceiveAddress } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
@@ -84,7 +84,7 @@ export function ReceiveScreen() {
   return (
     <section className="screen">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
-        <IconBack />
+        <IconBack size={20} />
         Back
       </button>
       <h1 className="screen-title">Receive</h1>
@@ -93,6 +93,10 @@ export function ReceiveScreen() {
         <label htmlFor="recv-asset">Asset</label>
         <div className="asset-select">
           <AssetIcon symbol={asset} size={28} />
+          <span className="asset-select__label">{asset}</span>
+          <span className="asset-select__chevron">
+            <IconChevronDown size={16} />
+          </span>
           <select
             id="recv-asset"
             value={asset}
