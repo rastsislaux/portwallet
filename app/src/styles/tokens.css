@@ -1,0 +1,48 @@
+:root {
+  --bg: #f3f1ec;
+  --bg-elevated: #faf9f6;
+  --bg-muted: #eae7e0;
+  --ink: #161616;
+  --ink-secondary: #5c5a54;
+  --ink-tertiary: #8a877e;
+  --border: #d9d5cc;
+  --border-strong: #b8b3a8;
+  --accent: #2f5d4a;
+  --accent-contrast: #f7f5f0;
+  --accent-soft: #e4ede8;
+  --danger: #8b2e2e;
+  --danger-soft: #f3e4e4;
+  --warning: #8a5a18;
+  --warning-soft: #f5eddc;
+  --success: #2f5d4a;
+  --overlay: rgba(22, 22, 22, 0.36);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --pad-screen: 20px;
+  --radius-control: 10px;
+  --radius-dialog: 16px;
+  --border-width: 1px;
+
+  --font: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --text-body: 15px;
+  --text-meta: 13px;
+  --text-title: 24px;
+  --text-balance: 38px;
+
+  --nav-height: 64px;
+  --max-col: 480px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (min-width: 880px) {
+  :root {
+    --pad-screen: 32px;
+  }
+}
