@@ -1,13 +1,28 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
-import { formatAssetQty, formatQty } from '../components/Amount';
+import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
 import { AssetIcon, IconExchange, IconReceive, IconSend, IconSettings } from '../components/icons';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
 export function HomeScreen() {
   const { ready, assets, totalFiatUsd, custodySummary, accounts } = useWallet();
-  const { displayCurrency, formatFromUsd, formatFromUsdParts } = useSettings();
+  const {
+    displayCurrency,
+    formatFromUsd,
+    formatFromUsdParts,
+    hideBelowThresholdUsd,
+    hideBelowThresholdAmount,
+    hideBelowThresholdCurrency,
+  } = useSettings();
+
+  const visibleAssets = useMemo(() => {
+    if (hideBelowThresholdUsd == null) return assets;
+    return assets.filter((a) => a.fiatValueUsd >= hideBelowThresholdUsd);
+  }, [assets, hideBelowThresholdUsd]);
+
+  const hiddenCount = assets.length - visibleAssets.length;
 
   const btc = assets.find((a) => a.symbol === 'BTC');
   const btcApprox = btc
@@ -86,7 +101,7 @@ export function HomeScreen() {
           <div className="section-block">
             <div className="section-label">Assets</div>
             <div className="asset-list">
-              {assets.map((asset) => (
+              {visibleAssets.map((asset) => (
                 <Link
                   key={asset.assetId}
                   className="asset-row"
@@ -106,6 +121,14 @@ export function HomeScreen() {
                 </Link>
               ))}
             </div>
+            {hiddenCount > 0 ? (
+              <p className="asset-list__hidden-note">
+                {visibleAssets.length === 0
+                  ? 'All assets are below'
+                  : `${hiddenCount} small ${hiddenCount === 1 ? 'asset' : 'assets'} hidden below`}{' '}
+                {formatFiat(hideBelowThresholdAmount)} {hideBelowThresholdCurrency}
+              </p>
+            ) : null}
           </div>
         </>
       )}
