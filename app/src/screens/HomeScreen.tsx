@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
 import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
+import { AssetIcon, IconExchange, IconReceive, IconSend } from '../components/icons';
 import { useWallet } from '../state/WalletContext';
 
 export function HomeScreen() {
@@ -17,7 +18,7 @@ export function HomeScreen() {
         <div className="brand-header">
           <div className="brand-mark">Portwallet</div>
         </div>
-        <p style={{ color: 'var(--ink-secondary)' }}>Loading accounts…</p>
+        <p className="loading-line">Loading accounts…</p>
       </section>
     );
   }
@@ -51,21 +52,22 @@ export function HomeScreen() {
           </div>
 
           <div className="action-row">
-            <Link className="btn" to="/send">
+            <Link className="btn btn--soft" to="/send">
+              <IconSend size={16} />
               Send
             </Link>
-            <Link className="btn" to="/receive">
+            <Link className="btn btn--soft" to="/receive">
+              <IconReceive size={16} />
               Receive
             </Link>
-            <Link className="btn" to="/exchange">
+            <Link className="btn btn--soft" to="/exchange">
+              <IconExchange size={16} />
               Exchange
             </Link>
           </div>
 
-          <div>
-            <div className="section-label" style={{ marginBottom: 4 }}>
-              Assets
-            </div>
+          <div className="section-block">
+            <div className="section-label">Assets</div>
             <div className="asset-list">
               {assets.map((asset) => (
                 <Link
@@ -73,6 +75,9 @@ export function HomeScreen() {
                   className="asset-row"
                   to={`/asset/${asset.assetId}`}
                 >
+                  <span className="asset-row__icon">
+                    <AssetIcon symbol={asset.symbol} />
+                  </span>
                   <span className="asset-row__symbol">{asset.symbol}</span>
                   <span className="asset-row__qty tabular">
                     {formatAssetQty(asset.symbol, asset.quantity)}

@@ -7,30 +7,31 @@ First viewport answers: whose money view this is, where custody lives, how much 
 ## Layout (mobile 390 × 844 logical)
 
 ```
-padding 20
-┌ Portwallet                    All ▾ ┐  15/13 meta filter
-│ Held by Bybit · 2 accounts          │  13px secondary, full width
-│                                     │  24 gap
-│ 12,480.42                           │  38px tabular
+padding 24
+┌ Portwallet                    All ▾ ┐  20px brand / quiet filter
+│ Held by Bybit · 2 accounts          │  13px secondary
+│                                     │  32 gap
+│ 12,480.42                           │  44px tabular, weight 500
 │ USD · ≈ 0.18 BTC                    │  13px tertiary
-│                                     │  24 gap
-│ ┌ Send ┐ ┌ Receive ┐ ┌ Exchange ┐   │  equal 10px radius, hairline
-│─────────────────────────────────────│  16 gap then rule
-│ Assets                              │  13px uppercase tracking slight
-│ BTC                 0.12000000      │
-│ Bitcoin             8,210.00 USD    │  two-line row, separator
-│ ETH …                               │
+│                                     │  32 gap
+│ ┌ Send ┐ ┌ Receive ┐ ┌ Exchange ┐   │  soft equal actions + line icons
+│                                     │
+│ Assets                              │  15px semibold section
+│ ● BTC               0.12000000      │  circular asset icon
+│   Bitcoin           8,210.00 USD    │  calm two-line row
+│ ● ETH …                             │
 └─────────────────────────────────────┘
-bottom nav 64 — Home active (accent bar 2px, not filled neon pill)
+bottom nav 68 — icons + labels; 2px accent bar on active
 ```
 
-Desktop: same column, max-width 480, horizontal padding 32, ambient wash full bleed behind the column.
+Desktop: same column, max-width 480, horizontal padding 36, flat warm-white field.
 
 ## Motion (subtle)
 
-1. Asset list rows stagger-fade 40ms on first paint (max 5 rows).
-2. Account filter menu: 120ms opacity + 4px translate.
-3. Action button: opacity 0.72 while pressed.
+1. Asset list rows stagger-fade ~35ms on first paint (max 5 rows).
+2. Account filter menu: 140ms opacity + 4px translate.
+3. Action button: slight opacity + 0.5px press.
+4. Screen enter: 180ms fade + 6px rise.
 
 ## Custody disclosure copy
 
@@ -45,25 +46,24 @@ Never “your keys” language for exchange accounts.
 
 | Risk | Present? | Fix |
 |------|----------|-----|
-| Purple/cyan gradient hero | No | Keep warm stone wash only |
+| Purple/cyan gradient hero | No | Flat warm white only |
 | Glassmorphism / glow | No | — |
-| Oversized rounded cards wrapping balance | Tempting | **Rejected** — balance sits on background; actions are flat bordered controls, not cards-in-cards |
-| Stat strip (24h %, PnL, gas) | Tempting | **Rejected** — not daily-wallet-critical |
-| Pill cluster filters | Mild risk on “All” | Keep as quiet text button with chevron |
-| Floating badges on hero | No | — |
-| Decorative crypto illustration | No | — |
+| Oversized rounded cards wrapping balance | Tempting | **Rejected** — balance sits on background |
+| Stat strip / fake analytics | Tempting | **Rejected** |
+| Pill cluster filters | Mild | Quiet text + chevron |
+| Decorative crypto illustration | No | Official-style asset marks only in list |
 | Inter/Roboto default | Avoided | IBM Plex Sans |
 | Dashboard multi-column | Avoided | Single column |
-| Accent overuse | Risk | Accent only on primary CTA fill (Exchange entry uses secondary on Home; Send is secondary outline; actually Home actions should be equal — all secondary outline, or one default). **Revision:** all three actions equal outline; accent reserved for Confirm in flows and active nav indicator |
-| Brand too weak | Risk if title competes | Balance is large but brand remains first line; no separate marketing headline |
+| Accent overuse | Risk | Accent on primary confirms + nav indicator; home actions soft/neutral |
+| Brand too weak | Risk | Brand 20px / 600 first; balance is numeric anchor, not a marketing headline |
 
-## Revision (applied)
+## Revision (visual polish)
 
-1. Remove any “Portfolio” screen title competing with brand — brand *is* the title.
-2. Equal-weight Send / Receive / Exchange (outline); accent reserved for irreversible confirms + nav indicator.
-3. Asset rows: symbol left, qty top-right, fiat bottom-right; no mini charts.
-4. Custody strip never collapses into an info icon.
-5. Slightly tighten balance → actions gap from 32 → 24 for daily-use density.
-6. Post-implementation polish: brand mark 17px (stronger first signal); solid nav surface (no translucent mix); asset quantities keep operational precision (BTC/ETH ≥4 dp, stables 2 dp).
+1. Balance enlarged to 44px; tighter tracking for luxury numerals.
+2. Soft equal actions with restrained line icons.
+3. Asset rows: circular crypto icons, more vertical air, quieter separators.
+4. Section titles: stronger sentence-case weight (not uppercase tracking).
+5. Flat background — no wash gradient.
+6. Controls: 48px height, 14px radius, trustworthy primary green.
 
-Overall direction unchanged: calm neutral wallet, multi-account honest custody, operational list.
+Overall direction unchanged: calm unified wallet, multi-account honest custody, operational list.

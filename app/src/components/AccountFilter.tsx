@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWallet } from '../state/WalletContext';
+import { IconChevronDown, ProviderIcon } from './icons';
 
 export function AccountFilter() {
   const { accounts, filter, setFilter } = useWallet();
@@ -29,7 +30,8 @@ export function AccountFilter() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {label} ▾
+        {label}
+        <IconChevronDown size={14} />
       </button>
       {open ? (
         <div className="filter-menu" role="listbox">
@@ -53,11 +55,16 @@ export function AccountFilter() {
                 setOpen(false);
               }}
             >
-              {account.nickname}
-              <div style={{ fontSize: 12, color: 'var(--ink-tertiary)' }}>
-                {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
-                {account.venueLabel}
-              </div>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ProviderIcon type={account.providerType} size={28} />
+                <span>
+                  {account.nickname}
+                  <div style={{ fontSize: 12, color: 'var(--ink-tertiary)', fontWeight: 400 }}>
+                    {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
+                    {account.venueLabel}
+                  </div>
+                </span>
+              </span>
             </button>
           ))}
         </div>

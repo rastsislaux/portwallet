@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
+import { AssetIcon, IconBack } from '../components/icons';
 import type {
   OperationResult,
   SendPreview,
@@ -143,21 +144,25 @@ export function SendScreen() {
     return (
       <section className="screen">
         <button type="button" className="back-link" onClick={() => setStep('form')}>
-          ← Edit
+          <IconBack />
+          Edit
         </button>
         <h1 className="screen-title">Review send</h1>
 
-        <div>
+        <div className="section-block">
           <div className="section-label">You send</div>
-          <div className="tabular" style={{ fontSize: 28, fontWeight: 500 }}>
-            {formatQty(preview.request.quantity)} {preview.request.assetSymbol}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <AssetIcon symbol={preview.request.assetSymbol} size={40} />
+            <div className="review-amount tabular">
+              {formatQty(preview.request.quantity)} {preview.request.assetSymbol}
+            </div>
           </div>
         </div>
 
-        <div>
+        <div className="section-block">
           <div className="section-label">To</div>
           <div style={{ wordBreak: 'break-all' }}>{preview.request.destination}</div>
-          <div style={{ color: 'var(--ink-secondary)', fontSize: 13, marginTop: 4 }}>
+          <div className="muted" style={{ fontSize: 13 }}>
             {preview.networkName} · {labelKind(preview.request.kind)}
           </div>
         </div>
@@ -212,23 +217,27 @@ export function SendScreen() {
   return (
     <section className="screen">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
-        ← Back
+        <IconBack />
+        Back
       </button>
       <h1 className="screen-title">Send</h1>
 
       <div className="field">
         <label htmlFor="send-asset">Asset</label>
-        <select
-          id="send-asset"
-          value={asset}
-          onChange={(e) => onAssetChange(e.target.value)}
-        >
-          {assetSymbols.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <div className="asset-select">
+          <AssetIcon symbol={asset} size={28} />
+          <select
+            id="send-asset"
+            value={asset}
+            onChange={(e) => onAssetChange(e.target.value)}
+          >
+            {assetSymbols.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="field">

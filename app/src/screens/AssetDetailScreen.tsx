@@ -1,5 +1,13 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { formatFiat, formatQty } from '../components/Amount';
+import {
+  AssetIcon,
+  IconBack,
+  IconExchange,
+  IconReceive,
+  IconSend,
+  ProviderIcon,
+} from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
 import { useWallet } from '../state/WalletContext';
 
@@ -13,7 +21,8 @@ export function AssetDetailScreen() {
     return (
       <section className="screen">
         <button type="button" className="back-link" onClick={() => navigate(-1)}>
-          ← Back
+          <IconBack />
+          Back
         </button>
         <p>Asset not found in selected accounts.</p>
       </section>
@@ -28,12 +37,16 @@ export function AssetDetailScreen() {
   return (
     <section className="screen">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
-        ← Back
+        <IconBack />
+        Back
       </button>
       <header className="header-block">
-        <h1 className="screen-title">{asset.name}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <AssetIcon symbol={asset.symbol} size={40} />
+          <h1 className="screen-title">{asset.name}</h1>
+        </div>
         <div className="portfolio-total">
-          <div className="portfolio-total__value tabular" style={{ fontSize: 32 }}>
+          <div className="portfolio-total__value tabular" style={{ fontSize: 36 }}>
             {formatQty(asset.quantity)} {asset.symbol}
           </div>
           <div className="portfolio-total__meta">
@@ -43,33 +56,39 @@ export function AssetDetailScreen() {
       </header>
 
       <div className="action-row">
-        <Link className="btn" to={`/send?asset=${asset.symbol}`}>
+        <Link className="btn btn--soft" to={`/send?asset=${asset.symbol}`}>
+          <IconSend size={16} />
           Send
         </Link>
-        <Link className="btn" to={`/receive?asset=${asset.symbol}`}>
+        <Link className="btn btn--soft" to={`/receive?asset=${asset.symbol}`}>
+          <IconReceive size={16} />
           Receive
         </Link>
-        <Link className="btn" to={`/exchange?from=${asset.symbol}`}>
+        <Link className="btn btn--soft" to={`/exchange?from=${asset.symbol}`}>
+          <IconExchange size={16} />
           Exchange
         </Link>
       </div>
 
-      <div>
-        <div className="section-label" style={{ marginBottom: 4 }}>
-          Held in
-        </div>
-        <div className="account-list">
+      <div className="section-block">
+        <div className="section-label">Held in</div>
+        <div className="account-list account-list--cards">
           {holdings.map((h) => {
             const account = accounts.find((a) => a.id === h.accountId);
             return (
-              <div key={h.accountId} className="account-row">
-                <span className="account-row__title">
-                  {account?.nickname ?? 'Account'}
-                </span>
-                <span className="tabular">{formatQty(h.quantity)}</span>
-                <span className="account-row__meta">
-                  {account?.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
-                  {account?.venueLabel}
+              <div key={h.accountId} className="account-card">
+                <ProviderIcon type={account?.providerType ?? 'mock'} size={40} />
+                <div className="account-card__body">
+                  <div className="account-card__title">
+                    {account?.nickname ?? 'Account'}
+                  </div>
+                  <div className="account-card__meta">
+                    {account?.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
+                    {account?.venueLabel}
+                  </div>
+                </div>
+                <span className="tabular" style={{ fontWeight: 500 }}>
+                  {formatQty(h.quantity)}
                 </span>
               </div>
             );
@@ -77,13 +96,11 @@ export function AssetDetailScreen() {
         </div>
       </div>
 
-      <div>
-        <div className="section-label" style={{ marginBottom: 4 }}>
-          Recent
-        </div>
+      <div className="section-block">
+        <div className="section-label">Recent</div>
         <div className="tx-list">
           {recent.length === 0 ? (
-            <p style={{ color: 'var(--ink-secondary)' }}>No recent activity.</p>
+            <p className="muted">No recent activity.</p>
           ) : (
             recent.map((tx) => (
               <div key={tx.id} className="tx-row">
@@ -100,7 +117,9 @@ export function AssetDetailScreen() {
                   {tx.providerLabel}
                   {tx.networkName ? ` · ${tx.networkName}` : ''}
                 </span>
-                <StatusBadge status={tx.status} />
+                <span className="tx-row__status">
+                  <StatusBadge status={tx.status} />
+                </span>
               </div>
             ))
           )}

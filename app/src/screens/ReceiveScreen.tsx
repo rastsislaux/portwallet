@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AssetIcon, IconBack, IconCopy } from '../components/icons';
 import type { ReceiveAddress } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
@@ -83,29 +84,33 @@ export function ReceiveScreen() {
   return (
     <section className="screen">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
-        ← Back
+        <IconBack />
+        Back
       </button>
       <h1 className="screen-title">Receive</h1>
 
       <div className="field">
         <label htmlFor="recv-asset">Asset</label>
-        <select
-          id="recv-asset"
-          value={asset}
-          onChange={(e) => {
-            const next = e.target.value;
-            setAsset(next);
-            const nextAccount =
-              balances.find((b) => b.symbol === next)?.accountId ?? accountId;
-            setAccountId(nextAccount);
-          }}
-        >
-          {assetSymbols.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <div className="asset-select">
+          <AssetIcon symbol={asset} size={28} />
+          <select
+            id="recv-asset"
+            value={asset}
+            onChange={(e) => {
+              const next = e.target.value;
+              setAsset(next);
+              const nextAccount =
+                balances.find((b) => b.symbol === next)?.accountId ?? accountId;
+              setAccountId(nextAccount);
+            }}
+          >
+            {assetSymbols.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="field">
@@ -138,15 +143,19 @@ export function ReceiveScreen() {
         </select>
       </div>
 
-      <div className="qr-placeholder" aria-hidden="true">
-        QR
+      <div className="qr-block">
+        <AssetIcon symbol={asset} size={44} />
+        <div className="qr-placeholder" aria-hidden="true">
+          QR
+        </div>
       </div>
 
       {receive ? (
         <>
           <div className="address-line">
             <code className="tabular">{receive.address}</code>
-            <button type="button" className="btn" onClick={() => void copyAddress()}>
+            <button type="button" className="btn btn--icon" onClick={() => void copyAddress()}>
+              <IconCopy size={16} />
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
