@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { WALLET_PRODUCT_LABELS } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 import { IconChevronDown, ProviderIcon } from './icons';
 
@@ -61,6 +62,9 @@ export function AccountFilter() {
                   {account.nickname}
                   <div style={{ fontSize: 12, color: 'var(--ink-tertiary)', fontWeight: 400 }}>
                     {account.venueLabel}
+                    {account.product
+                      ? ` · ${WALLET_PRODUCT_LABELS[account.product]}`
+                      : ''}
                   </div>
                 </span>
               </span>

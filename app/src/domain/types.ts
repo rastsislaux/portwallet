@@ -28,10 +28,16 @@ export interface WalletAccount {
   id: string;
   nickname: string;
   providerType: ProviderType;
+  /**
+   * Shared id for accounts created from one connect (e.g. Bybit Funding/UTA/Earn
+   * from the same API key). Used to find sibling product accounts.
+   */
   providerInstanceId: string;
   custody: CustodyKind;
   venueLabel: string;
   connectedAt: string;
+  /** Venue wallet bucket this account represents (Bybit Funding / UTA / Earn). */
+  product?: WalletProduct;
   /** Selected Bybit API host when providerType is bybit. */
   bybitServer?: BybitServerId;
   /** Snapshot of API key capabilities after connect. */

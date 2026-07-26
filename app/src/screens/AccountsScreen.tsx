@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconBack, ProviderIcon } from '../components/icons';
 import type { BybitServerId, ProviderType } from '../domain/types';
+import { WALLET_PRODUCT_LABELS } from '../domain/types';
 import { BYBIT_SERVERS } from '../providers/bybit/servers';
 import { useWallet } from '../state/WalletContext';
 
@@ -85,6 +86,9 @@ export function AccountsScreen() {
               <div className="grouped-row__title">{account.nickname}</div>
               <div className="grouped-row__meta">
                 {account.venueLabel}
+                {account.product
+                  ? ` · ${WALLET_PRODUCT_LABELS[account.product]}`
+                  : ''}
                 {' · '}
                 {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'}
                 {account.bybitServer ? ` · ${serverLabel(account.bybitServer)}` : ''}
@@ -111,7 +115,10 @@ export function AccountsScreen() {
 
       {accounts.length === 0 ? (
         <div className="empty" style={{ marginTop: 8 }}>
-          <p>Connect Bybit with an API key to load Funding, UTA, Earn, and Card data.</p>
+          <p>
+            Connect Bybit with an API key. Portwallet creates separate Funding, UTA,
+            and Earn accounts when your key allows them.
+          </p>
         </div>
       ) : null}
 
@@ -212,8 +219,8 @@ export function AccountsScreen() {
                   />
                 </div>
                 <div className="notice notice--info" style={{ margin: 0 }}>
-                  Keys stay in this browser session only. Actions are blocked when the
-                  key lacks the required Bybit permission. Earn is view-only.
+                  Keys stay in this browser session only. One connect creates Funding,
+                  UTA, and Earn accounts when permissions allow. Earn is view-only.
                 </div>
               </>
             ) : null}

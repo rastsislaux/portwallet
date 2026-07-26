@@ -27,7 +27,8 @@ export interface CryptoProvider {
   readonly custody: CustodyKind;
   readonly venueLabel: string;
 
-  connect(config: ConnectConfig): Promise<WalletAccount>;
+  /** May return multiple accounts (e.g. Bybit Funding / UTA / Earn from one key). */
+  connect(config: ConnectConfig): Promise<WalletAccount[]>;
   disconnect(accountId: string): Promise<void>;
 
   listBalances(accountId: string): Promise<AssetBalance[]>;
