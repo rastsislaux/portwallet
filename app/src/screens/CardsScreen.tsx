@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatFiat, formatQty } from '../components/Amount';
+import { CryptoIcon } from '../components/icons';
 import { PaymentCard } from '../components/PaymentCard';
 import { StatusBadge } from '../components/StatusBadge';
 import type { CardOperation, ProviderCard } from '../domain/types';
@@ -180,7 +181,10 @@ function CardDetail({
           <div className="funding-breakdown">
             {eligibleFunding.map((asset) => (
               <div key={asset.symbol} className="funding-breakdown__row">
-                <span>{asset.symbol}</span>
+                <span className="funding-breakdown__asset">
+                  <CryptoIcon symbol={asset.symbol} name={asset.name} size={24} decorative />
+                  {asset.symbol}
+                </span>
                 <span className="tabular">
                   {formatQty(asset.quantity, asset.symbol === 'USDT' || asset.symbol === 'USDC' ? 2 : 8)} ·{' '}
                   {formatFromUsd(asset.fiatValueUsd)}
@@ -201,6 +205,11 @@ function CardDetail({
           <div className="tx-list">
             {operations.map((op) => (
               <div key={op.id} className="tx-row">
+                {op.assetSymbol ? (
+                  <span className="tx-row__icon">
+                    <CryptoIcon symbol={op.assetSymbol} size={32} decorative />
+                  </span>
+                ) : null}
                 <span className="tx-row__title">
                   {labelCardKind(op.kind)}
                   {op.merchant ? ` · ${op.merchant}` : ''}

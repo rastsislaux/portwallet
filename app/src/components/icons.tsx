@@ -1,4 +1,4 @@
-import type { CSSProperties, ComponentType } from 'react';
+import type { ComponentType } from 'react';
 import {
   Activity,
   ArrowDown,
@@ -15,11 +15,8 @@ import {
   WalletCards,
   type LucideProps,
 } from 'lucide-react';
-import btcIcon from 'cryptocurrency-icons/svg/color/btc.svg';
-import ethIcon from 'cryptocurrency-icons/svg/color/eth.svg';
-import usdtIcon from 'cryptocurrency-icons/svg/color/usdt.svg';
-import usdcIcon from 'cryptocurrency-icons/svg/color/usdc.svg';
 import type { ProviderType } from '../domain/types';
+export { CryptoIcon } from './CryptoIcon';
 
 type IconProps = LucideProps & {
   size?: number;
@@ -47,53 +44,6 @@ export const IconSwap = withDefaults(ArrowDownUp);
 export const IconCopy = withDefaults(Copy);
 export const IconBack = withDefaults(ArrowLeft);
 export const IconCheck = withDefaults(Check);
-
-const assetIcons: Record<string, string> = {
-  BTC: btcIcon,
-  ETH: ethIcon,
-  USDT: usdtIcon,
-  USDC: usdcIcon,
-};
-
-export function AssetIcon({
-  symbol,
-  size = 40,
-}: {
-  symbol: string;
-  size?: number;
-}) {
-  const src = assetIcons[symbol.toUpperCase()];
-  const style: CSSProperties = {
-    width: size,
-    height: size,
-  };
-
-  if (src) {
-    return (
-      <span className="asset-icon" style={style} aria-hidden="true">
-        <img src={src} alt="" width={size} height={size} draggable={false} />
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="asset-icon"
-      style={{
-        ...style,
-        display: 'inline-grid',
-        placeItems: 'center',
-        background: 'var(--ink)',
-        color: 'var(--ink-inverse)',
-        fontSize: size * 0.34,
-        fontWeight: 600,
-      }}
-      aria-hidden="true"
-    >
-      {symbol.slice(0, 1)}
-    </span>
-  );
-}
 
 const providerMeta: Record<
   ProviderType,
