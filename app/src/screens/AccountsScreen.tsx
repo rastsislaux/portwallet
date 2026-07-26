@@ -44,9 +44,6 @@ export function AccountsScreen() {
     <section className="screen">
       <header className="header-block">
         <h1 className="screen-title">Accounts</h1>
-        <p className="custody-strip" style={{ marginTop: 0 }}>
-          Multiple accounts allowed — including several of the same venue.
-        </p>
       </header>
 
       <div className="grouped-list">

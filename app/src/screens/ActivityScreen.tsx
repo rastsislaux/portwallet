@@ -52,14 +52,14 @@ export function ActivityScreen() {
         <>
           {pending.length > 0 && filter === 'all' ? (
             <div className="section-block">
-              <div className="section-label">Pending</div>
+              <div className="section-eyebrow">Pending</div>
               <TxList items={pending} />
             </div>
           ) : null}
 
           <div className="section-block">
             {filter === 'all' && pending.length > 0 ? (
-              <div className="section-label">Earlier</div>
+              <div className="section-eyebrow">Earlier</div>
             ) : null}
             <TxList items={filter === 'all' ? rest : filtered} />
           </div>

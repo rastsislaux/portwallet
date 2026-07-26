@@ -127,12 +127,10 @@ export function ProviderIcon({
         <svg width={markSize} height={markSize} viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 3.2 14.8 6 12 8.8 9.2 6 12 3.2Zm0 5.6L16.4 13 12 17.4 7.6 13 12 8.8Zm5.6-2L20.4 9.6 18.2 11.8l-2.2-2.2 1.6-1.6ZM6.4 6.8 8.6 9 6.4 11.2 3.6 8.4 6.4 6.8Zm0 7.6L8.6 16.6 6.4 18.8 3.6 16 6.4 14.4Zm11.2 0L20.4 16 18.2 18.2l-2.2-2.2 1.6-1.6ZM12 15.6l2.8 2.8L12 21.2l-2.8-2.8L12 15.6Z" />
         </svg>
-      ) : type === 'bybit' ? (
-        <svg width={markSize} height={markSize} viewBox="0 0 24 24" fill="currentColor">
-          <path d="M6 6h4.2l3.3 5.2L17.2 6H21l-5.4 8.4V18h-3.2v-3.6L6 6Z" />
-        </svg>
       ) : (
-        meta.mark
+        <span style={{ fontSize: size * 0.42, fontWeight: 700, lineHeight: 1 }}>
+          {meta.mark}
+        </span>
       )}
     </span>
   );

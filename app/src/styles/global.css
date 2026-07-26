@@ -204,7 +204,7 @@ img {
   font-size: var(--text-balance);
   line-height: var(--leading-tight);
   font-weight: 600;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.055em;
   display: flex;
   align-items: baseline;
 }
@@ -275,14 +275,14 @@ img {
 }
 
 .btn--soft {
-  min-height: var(--action-height);
-  height: var(--action-height);
+  min-height: 36px;
+  height: 36px;
   border: 0;
   background: var(--bg-fill);
   border-radius: var(--radius-pill);
-  padding: 0 16px;
+  padding: 0 14px;
   gap: 6px;
-  font-size: var(--text-callout);
+  font-size: 13px;
   font-weight: 590;
   color: var(--ink);
   box-shadow: none;
@@ -299,8 +299,8 @@ img {
 }
 
 .btn--soft svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
   stroke-width: 2.25;
 }
@@ -400,6 +400,15 @@ img {
   margin-bottom: 2px;
 }
 
+.section-eyebrow {
+  font-size: var(--text-caption);
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--ink-tertiary);
+  letter-spacing: -0.01em;
+  padding: 0 4px 6px;
+}
+
 .section-block {
   display: flex;
   flex-direction: column;
@@ -434,6 +443,7 @@ img {
   border-radius: 0;
   width: 100%;
   min-height: 72px;
+  position: relative;
   transition: opacity var(--duration-fast) var(--ease);
   animation: row-in 240ms var(--ease) both;
 }
@@ -442,8 +452,14 @@ img {
   opacity: 0.55;
 }
 
-.asset-row + .asset-row {
-  border-top: var(--border-width) solid var(--separator);
+.asset-row + .asset-row::before {
+  content: '';
+  position: absolute;
+  left: 54px;
+  right: 0;
+  top: 0;
+  height: var(--border-width);
+  background: var(--separator);
 }
 
 .asset-row:nth-child(1) { animation-delay: 0ms; }
@@ -588,7 +604,7 @@ img {
   font-size: var(--text-micro);
   line-height: 1;
   font-weight: 500;
-  color: var(--ink-tertiary);
+  color: var(--ink-quaternary);
   letter-spacing: 0;
 }
 
@@ -807,8 +823,9 @@ img {
 
 .bottom-nav a.is-active {
   color: var(--ink);
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.06);
   font-weight: 600;
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.7);
 }
 
 .bottom-nav a.is-active svg {
