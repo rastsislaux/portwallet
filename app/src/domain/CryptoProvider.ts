@@ -1,10 +1,14 @@
 import type {
   AssetBalance,
+  CardCapability,
+  CardOperation,
   ConnectConfig,
   ExchangeQuote,
   ExchangeRequest,
+  FundingAssetBalance,
   NetworkInfo,
   OperationResult,
+  ProviderCard,
   ProviderType,
   CustodyKind,
   ReceiveAddress,
@@ -41,4 +45,14 @@ export interface CryptoProvider {
 
   prepareExchange(request: ExchangeRequest): Promise<ExchangeQuote>;
   submitExchange(quoteId: string): Promise<OperationResult>;
+
+  /** Whether this venue issues payment cards for the given account. */
+  getCardCapability(accountId: string): Promise<CardCapability>;
+  listCards(accountId: string): Promise<ProviderCard[]>;
+  getCardOperations(accountId: string, cardId?: string): Promise<CardOperation[]>;
+  /**
+   * Funding-account balances used when card spend balance is calculated
+   * (e.g. Bybit sums eligible coins instead of exposing a card balance API).
+   */
+  listFundingBalances(accountId: string): Promise<FundingAssetBalance[]>;
 }

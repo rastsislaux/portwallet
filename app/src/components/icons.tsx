@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   Copy,
+  CreditCard,
   Home,
   Repeat2,
   WalletCards,
@@ -33,6 +34,7 @@ function withDefaults(Icon: ComponentType<LucideProps>) {
 
 export const IconHome = withDefaults(Home);
 export const IconActivity = withDefaults(Activity);
+export const IconCards = withDefaults(CreditCard);
 export const IconExchange = withDefaults(Repeat2);
 export const IconAccounts = withDefaults(WalletCards);
 export const IconSend = withDefaults(ArrowUpRight);

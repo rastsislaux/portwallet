@@ -1,12 +1,16 @@
 import type { CryptoProvider } from '../domain/CryptoProvider';
 import type {
   AssetBalance,
+  CardCapability,
+  CardOperation,
   ConnectConfig,
   CustodyKind,
   ExchangeQuote,
   ExchangeRequest,
+  FundingAssetBalance,
   NetworkInfo,
   OperationResult,
+  ProviderCard,
   ProviderType,
   ReceiveAddress,
   SendPreview,
@@ -25,9 +29,19 @@ const NETWORKS: NetworkInfo[] = [
   { id: 'erc20', name: 'Ethereum (ERC20)', assetSymbol: 'USDT' },
 ];
 
+/** Stablecoins Bybit allows for card spend from the funding account. */
+const BYBIT_CARD_ELIGIBLE = new Set(['USDT', 'USDC']);
+
 type InstanceSeed = {
   balances: Omit<AssetBalance, 'accountId'>[];
   transactions: Omit<Transaction, 'accountId' | 'providerLabel'>[];
+  funding: Omit<FundingAssetBalance, never>[];
+  /**
+   * `unsupported` — venue never issues cards.
+   * `none` — venue supports cards but this account has none.
+   * `issued` — one or more cards exist for the account.
+   */
+  cardMode: 'unsupported' | 'none' | 'issued';
 };
 
 function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
@@ -61,10 +75,25 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
           createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
         },
       ],
+      funding: [],
+      cardMode: 'unsupported',
     };
   }
 
   const skew = instanceIndex % 2 === 0 ? 1 : 0.55;
+  const usdtQty = 220 * (instanceIndex + 1);
+  const usdcQty = type === 'bybit' ? 180 * skew : 90 * skew;
+
+  let cardMode: InstanceSeed['cardMode'] = 'issued';
+  if (type === 'bybit') {
+    // First Bybit account has a card; additional Bybit accounts support cards but none issued.
+    cardMode = instanceIndex === 0 ? 'issued' : 'none';
+  } else if (type === 'binance') {
+    cardMode = 'issued';
+  } else {
+    cardMode = 'unsupported';
+  }
+
   return {
     balances: [
       {
@@ -85,8 +114,8 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
         assetId: 'usdt',
         symbol: 'USDT',
         name: 'Tether',
-        quantity: 220 * (instanceIndex + 1),
-        fiatValueUsd: 220 * (instanceIndex + 1),
+        quantity: usdtQty,
+        fiatValueUsd: usdtQty,
       },
     ],
     transactions: [
@@ -132,7 +161,132 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
         createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
       },
     ],
+    funding: [
+      {
+        symbol: 'USDT',
+        name: 'Tether',
+        quantity: usdtQty,
+        fiatValueUsd: usdtQty,
+        cardEligible: true,
+      },
+      {
+        symbol: 'USDC',
+        name: 'USD Coin',
+        quantity: usdcQty,
+        fiatValueUsd: usdcQty,
+        cardEligible: type === 'bybit' ? BYBIT_CARD_ELIGIBLE.has('USDC') : true,
+      },
+      {
+        symbol: 'BTC',
+        name: 'Bitcoin',
+        quantity: 0.004 * skew,
+        fiatValueUsd: 273.68 * skew,
+        cardEligible: false,
+      },
+    ],
+    cardMode,
   };
+}
+
+function sumEligibleFunding(funding: FundingAssetBalance[]): {
+  balanceUsd: number;
+  symbols: string[];
+} {
+  const eligible = funding.filter((f) => f.cardEligible);
+  return {
+    balanceUsd: eligible.reduce((sum, f) => sum + f.fiatValueUsd, 0),
+    symbols: eligible.map((f) => f.symbol),
+  };
+}
+
+function seedCardOperations(
+  cardId: string,
+  accountId: string,
+  providerLabel: string,
+): CardOperation[] {
+  return [
+    {
+      id: nextId('cardop'),
+      cardId,
+      accountId,
+      kind: 'purchase',
+      status: 'completed',
+      merchant: 'Apple Store',
+      amountFiat: 48.99,
+      currency: 'USD',
+      assetSymbol: 'USDT',
+      quantity: 48.99,
+      createdAt: new Date(Date.now() - 3600000 * 6).toISOString(),
+      providerLabel,
+    },
+    {
+      id: nextId('cardop'),
+      cardId,
+      accountId,
+      kind: 'purchase',
+      status: 'pending',
+      merchant: 'Uber',
+      amountFiat: 18.4,
+      currency: 'USD',
+      assetSymbol: 'USDT',
+      quantity: 18.4,
+      createdAt: new Date(Date.now() - 900000).toISOString(),
+      providerLabel,
+    },
+    {
+      id: nextId('cardop'),
+      cardId,
+      accountId,
+      kind: 'atm',
+      status: 'failed',
+      merchant: 'ATM · Berlin',
+      amountFiat: 100,
+      currency: 'USD',
+      failureReason: 'Daily ATM limit exceeded',
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+      providerLabel,
+    },
+    {
+      id: nextId('cardop'),
+      cardId,
+      accountId,
+      kind: 'refund',
+      status: 'completed',
+      merchant: 'Amazon',
+      amountFiat: 24.5,
+      currency: 'USD',
+      assetSymbol: 'USDC',
+      quantity: 24.5,
+      createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+      providerLabel,
+    },
+    {
+      id: nextId('cardop'),
+      cardId,
+      accountId,
+      kind: 'fee',
+      status: 'completed',
+      merchant: 'Foreign transaction fee',
+      amountFiat: 0.62,
+      currency: 'USD',
+      createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+      providerLabel,
+    },
+    {
+      id: nextId('cardop'),
+      cardId,
+      accountId,
+      kind: 'top_up',
+      status: 'completed',
+      merchant: 'Funding account',
+      amountFiat: 200,
+      currency: 'USD',
+      assetSymbol: 'USDT',
+      quantity: 200,
+      createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+      providerLabel,
+    },
+  ];
 }
 
 /**
@@ -147,6 +301,10 @@ export class MockCryptoProvider implements CryptoProvider {
   private accounts = new Map<string, WalletAccount>();
   private balances = new Map<string, AssetBalance[]>();
   private transactions = new Map<string, Transaction[]>();
+  private funding = new Map<string, FundingAssetBalance[]>();
+  private cardModes = new Map<string, InstanceSeed['cardMode']>();
+  private cards = new Map<string, ProviderCard[]>();
+  private cardOperations = new Map<string, CardOperation[]>();
   private sendPreviews = new Map<string, SendPreview>();
   private exchangeQuotes = new Map<string, ExchangeQuote>();
   private instanceCount = 0;
@@ -184,14 +342,83 @@ export class MockCryptoProvider implements CryptoProvider {
         providerLabel: account.nickname,
       })),
     );
+    this.funding.set(
+      account.id,
+      seed.funding.map((f) => ({ ...f })),
+    );
+    this.cardModes.set(account.id, seed.cardMode);
+
+    if (seed.cardMode === 'issued') {
+      const cards = this.buildCards(account, seed.funding);
+      this.cards.set(account.id, cards);
+      const ops = cards.flatMap((card) =>
+        seedCardOperations(card.id, account.id, account.nickname),
+      );
+      this.cardOperations.set(account.id, ops);
+    } else {
+      this.cards.set(account.id, []);
+      this.cardOperations.set(account.id, []);
+    }
 
     return account;
+  }
+
+  private buildCards(
+    account: WalletAccount,
+    funding: FundingAssetBalance[],
+  ): ProviderCard[] {
+    if (account.providerType === 'bybit') {
+      const { balanceUsd, symbols } = sumEligibleFunding(funding);
+      return [
+        {
+          id: nextId('card'),
+          accountId: account.id,
+          providerType: 'bybit',
+          label: 'Bybit Card',
+          lastFour: '4281',
+          network: 'visa',
+          status: 'active',
+          holderName: account.nickname.replace(/\s+Bybit$/i, '') || 'Cardholder',
+          currency: 'USD',
+          balanceUsd,
+          balanceSource: 'calculated',
+          fundingAssetSymbols: symbols,
+          expiresLabel: '09/28',
+        },
+      ];
+    }
+
+    if (account.providerType === 'binance') {
+      return [
+        {
+          id: nextId('card'),
+          accountId: account.id,
+          providerType: 'binance',
+          label: 'Binance Card',
+          lastFour: '7712',
+          network: 'mastercard',
+          status: 'active',
+          holderName: account.nickname.replace(/\s+Binance$/i, '') || 'Cardholder',
+          currency: 'USD',
+          balanceUsd: 512.4,
+          balanceSource: 'provider',
+          fundingAssetSymbols: [],
+          expiresLabel: '11/27',
+        },
+      ];
+    }
+
+    return [];
   }
 
   async disconnect(accountId: string): Promise<void> {
     this.accounts.delete(accountId);
     this.balances.delete(accountId);
     this.transactions.delete(accountId);
+    this.funding.delete(accountId);
+    this.cardModes.delete(accountId);
+    this.cards.delete(accountId);
+    this.cardOperations.delete(accountId);
   }
 
   async listBalances(accountId: string): Promise<AssetBalance[]> {
@@ -204,6 +431,50 @@ export class MockCryptoProvider implements CryptoProvider {
 
   async getTransactions(accountId: string): Promise<Transaction[]> {
     return [...(this.transactions.get(accountId) ?? [])];
+  }
+
+  async getCardCapability(accountId: string): Promise<CardCapability> {
+    const mode = this.cardModes.get(accountId);
+    if (!mode || mode === 'unsupported') {
+      return {
+        supported: false,
+        unsupportedReason:
+          this.type === 'non_custodial'
+            ? 'Non-custodial wallets do not issue payment cards.'
+            : `${this.venueLabel} does not issue payment cards.`,
+      };
+    }
+    return { supported: true };
+  }
+
+  async listCards(accountId: string): Promise<ProviderCard[]> {
+    const cards = this.cards.get(accountId) ?? [];
+    // Refresh calculated balances from current funding (Bybit-style).
+    return cards.map((card) => {
+      if (card.balanceSource !== 'calculated') return { ...card };
+      const funding = this.funding.get(accountId) ?? [];
+      const { balanceUsd, symbols } = sumEligibleFunding(funding);
+      return {
+        ...card,
+        balanceUsd,
+        fundingAssetSymbols: symbols,
+      };
+    });
+  }
+
+  async getCardOperations(
+    accountId: string,
+    cardId?: string,
+  ): Promise<CardOperation[]> {
+    const ops = this.cardOperations.get(accountId) ?? [];
+    const filtered = cardId ? ops.filter((o) => o.cardId === cardId) : ops;
+    return [...filtered].sort(
+      (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+    );
+  }
+
+  async listFundingBalances(accountId: string): Promise<FundingAssetBalance[]> {
+    return [...(this.funding.get(accountId) ?? [])];
   }
 
   async prepareSend(request: SendRequest): Promise<SendPreview> {

@@ -122,3 +122,73 @@ export interface ConnectConfig {
   /** Distinguishes multiple accounts of the same provider type */
   labelHint?: string;
 }
+
+export type CardNetwork = 'visa' | 'mastercard';
+
+export type CardStatus = 'active' | 'frozen' | 'pending';
+
+export type CardBalanceSource = 'provider' | 'calculated';
+
+export type CardOperationKind =
+  | 'purchase'
+  | 'refund'
+  | 'atm'
+  | 'fee'
+  | 'top_up';
+
+/**
+ * Whether a connected account can have payment cards.
+ * Providers may omit cards entirely, or support them without issuing any yet.
+ */
+export interface CardCapability {
+  supported: boolean;
+  /** Present when supported is false (e.g. non-custodial wallets). */
+  unsupportedReason?: string;
+}
+
+export interface ProviderCard {
+  id: string;
+  accountId: string;
+  providerType: ProviderType;
+  label: string;
+  lastFour: string;
+  network: CardNetwork;
+  status: CardStatus;
+  holderName: string;
+  currency: string;
+  /** Available spend balance in fiat (USD-normalized for the prototype). */
+  balanceUsd: number;
+  /**
+   * `provider` — venue reported the balance.
+   * `calculated` — app summed allowed funding-account coins (e.g. Bybit).
+   */
+  balanceSource: CardBalanceSource;
+  /** Assets included when balanceSource is `calculated`. */
+  fundingAssetSymbols: string[];
+  expiresLabel: string;
+}
+
+export interface CardOperation {
+  id: string;
+  cardId: string;
+  accountId: string;
+  kind: CardOperationKind;
+  status: OperationStatus;
+  merchant: string;
+  amountFiat: number;
+  currency: string;
+  assetSymbol?: string;
+  quantity?: number;
+  createdAt: string;
+  providerLabel: string;
+  failureReason?: string;
+}
+
+export interface FundingAssetBalance {
+  symbol: string;
+  name: string;
+  quantity: number;
+  fiatValueUsd: number;
+  /** Whether this asset can fund card spend for the account. */
+  cardEligible: boolean;
+}
