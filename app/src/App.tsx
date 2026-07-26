@@ -3,6 +3,7 @@ import { AppShell } from './components/AppShell';
 import { AccountsScreen } from './screens/AccountsScreen';
 import { ActivityScreen } from './screens/ActivityScreen';
 import { AssetDetailScreen } from './screens/AssetDetailScreen';
+import { CardsScreen } from './screens/CardsScreen';
 import { ExchangeScreen } from './screens/ExchangeScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { ReceiveScreen } from './screens/ReceiveScreen';
@@ -17,6 +18,7 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route index element={<HomeScreen />} />
             <Route path="activity" element={<ActivityScreen />} />
+            <Route path="cards" element={<CardsScreen />} />
             <Route path="exchange" element={<ExchangeScreen />} />
             <Route path="accounts" element={<AccountsScreen />} />
             <Route path="asset/:assetId" element={<AssetDetailScreen />} />

@@ -11,9 +11,13 @@ import {
 import type {
   AggregatedAsset,
   AssetBalance,
+  CardCapability,
+  CardOperation,
   ExchangeQuote,
   ExchangeRequest,
+  FundingAssetBalance,
   OperationResult,
+  ProviderCard,
   ProviderType,
   ReceiveAddress,
   SendPreview,
@@ -25,6 +29,12 @@ import { ProviderRegistry } from '../providers/registry';
 
 export type AccountFilter = 'all' | string;
 
+export type AccountCardStatus = {
+  account: WalletAccount;
+  capability: CardCapability;
+  cards: ProviderCard[];
+};
+
 type WalletContextValue = {
   ready: boolean;
   accounts: WalletAccount[];
@@ -35,6 +45,10 @@ type WalletContextValue = {
   assets: AggregatedAsset[];
   totalFiatUsd: number;
   transactions: Transaction[];
+  cards: ProviderCard[];
+  cardOperations: CardOperation[];
+  accountCardStatuses: AccountCardStatus[];
+  fundingByAccountId: Record<string, FundingAssetBalance[]>;
   custodySummary: string;
   availableProviderTypes: ReturnType<ProviderRegistry['listAvailableTypes']>;
   refresh: () => Promise<void>;
@@ -123,6 +137,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [filter, setFilter] = useState<AccountFilter>('all');
   const [balances, setBalances] = useState<AssetBalance[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [cards, setCards] = useState<ProviderCard[]>([]);
+  const [cardOperations, setCardOperations] = useState<CardOperation[]>([]);
+  const [accountCardStatuses, setAccountCardStatuses] = useState<AccountCardStatus[]>(
+    [],
+  );
+  const [fundingByAccountId, setFundingByAccountId] = useState<
+    Record<string, FundingAssetBalance[]>
+  >({});
 
   const selectedAccounts = useMemo(() => {
     if (filter === 'all') return accounts;
@@ -132,14 +154,41 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const bals: AssetBalance[] = [];
     const txs: Transaction[] = [];
+    const nextCards: ProviderCard[] = [];
+    const nextOps: CardOperation[] = [];
+    const statuses: AccountCardStatus[] = [];
+    const fundingMap: Record<string, FundingAssetBalance[]> = {};
+
     for (const account of selectedAccounts) {
       const provider = registry.getForAccount(account.id);
       bals.push(...(await provider.listBalances(account.id)));
       txs.push(...(await provider.getTransactions(account.id)));
+
+      const capability = await provider.getCardCapability(account.id);
+      const accountCards = capability.supported
+        ? await provider.listCards(account.id)
+        : [];
+      const ops = capability.supported
+        ? await provider.getCardOperations(account.id)
+        : [];
+      const funding = capability.supported
+        ? await provider.listFundingBalances(account.id)
+        : [];
+
+      nextCards.push(...accountCards);
+      nextOps.push(...ops);
+      statuses.push({ account, capability, cards: accountCards });
+      fundingMap[account.id] = funding;
     }
+
     txs.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    nextOps.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
     setBalances(bals);
     setTransactions(txs);
+    setCards(nextCards);
+    setCardOperations(nextOps);
+    setAccountCardStatuses(statuses);
+    setFundingByAccountId(fundingMap);
   }, [selectedAccounts]);
 
   const didBootstrap = useRef(false);
@@ -247,6 +296,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       assets,
       totalFiatUsd,
       transactions,
+      cards,
+      cardOperations,
+      accountCardStatuses,
+      fundingByAccountId,
       custodySummary,
       availableProviderTypes,
       refresh,
@@ -268,6 +321,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       assets,
       totalFiatUsd,
       transactions,
+      cards,
+      cardOperations,
+      accountCardStatuses,
+      fundingByAccountId,
       custodySummary,
       availableProviderTypes,
       refresh,
