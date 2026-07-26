@@ -29,7 +29,7 @@ export function AppShell() {
               end={tab.end}
               className={({ isActive }) => (isActive ? 'is-active' : undefined)}
             >
-              <Icon size={20} />
+              <Icon size={22} />
               {tab.label}
             </NavLink>
           );

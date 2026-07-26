@@ -60,11 +60,11 @@ export function AccountsScreen() {
                 {account.venueLabel}
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+            <div className="account-card__aside">
               <span className="account-card__state">Connected</span>
               <button
                 type="button"
-                className="filter-button"
+                className="filter-button filter-button--quiet"
                 onClick={() => setConfirmRemoveId(account.id)}
               >
                 Remove

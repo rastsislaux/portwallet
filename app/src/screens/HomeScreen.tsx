@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
-import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
+import { formatAssetQty, formatFiat, formatFiatParts, formatQty } from '../components/Amount';
 import { AssetIcon, IconExchange, IconReceive, IconSend } from '../components/icons';
 import { useWallet } from '../state/WalletContext';
 
@@ -11,10 +11,11 @@ export function HomeScreen() {
   const btcApprox = btc
     ? formatQty(totalFiatUsd / (btc.fiatValueUsd / btc.quantity || 68420), 4)
     : formatQty(totalFiatUsd / 68420, 4);
+  const balance = formatFiatParts(totalFiatUsd);
 
   if (!ready) {
     return (
-      <section className="screen">
+      <section className="screen screen--home">
         <div className="brand-header">
           <div className="brand-mark">Portwallet</div>
         </div>
@@ -24,7 +25,7 @@ export function HomeScreen() {
   }
 
   return (
-    <section className="screen">
+    <section className="screen screen--home">
       <header className="header-block">
         <div className="brand-header">
           <div className="brand-mark">Portwallet</div>
@@ -43,8 +44,9 @@ export function HomeScreen() {
       ) : (
         <>
           <div className="portfolio-total">
-            <div className="portfolio-total__value tabular">
-              {formatFiat(totalFiatUsd)}
+            <div className="portfolio-total__value tabular" aria-label={`${balance.integer}.${balance.decimal} USD`}>
+              <span className="portfolio-total__int">{balance.integer}</span>
+              <span className="portfolio-total__dec">.{balance.decimal}</span>
             </div>
             <div className="portfolio-total__meta">
               USD · ≈ {btcApprox} BTC
@@ -53,15 +55,15 @@ export function HomeScreen() {
 
           <div className="action-row">
             <Link className="btn btn--soft" to="/send">
-              <IconSend size={16} />
+              <IconSend size={18} />
               Send
             </Link>
             <Link className="btn btn--soft" to="/receive">
-              <IconReceive size={16} />
+              <IconReceive size={18} />
               Receive
             </Link>
             <Link className="btn btn--soft" to="/exchange">
-              <IconExchange size={16} />
+              <IconExchange size={18} />
               Exchange
             </Link>
           </div>
@@ -76,7 +78,7 @@ export function HomeScreen() {
                   to={`/asset/${asset.assetId}`}
                 >
                   <span className="asset-row__icon">
-                    <AssetIcon symbol={asset.symbol} />
+                    <AssetIcon symbol={asset.symbol} size={44} />
                   </span>
                   <span className="asset-row__symbol">{asset.symbol}</span>
                   <span className="asset-row__qty tabular">

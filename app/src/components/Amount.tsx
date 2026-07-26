@@ -19,6 +19,12 @@ export function formatFiat(value: number): string {
   });
 }
 
+export function formatFiatParts(value: number): { integer: string; decimal: string } {
+  const formatted = formatFiat(value);
+  const [integer, decimal = '00'] = formatted.split('.');
+  return { integer, decimal };
+}
+
 export function formatQty(value: number, max = 8, min = 0): string {
   return value.toLocaleString('en-US', {
     minimumFractionDigits: min,

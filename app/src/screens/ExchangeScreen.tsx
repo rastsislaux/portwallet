@@ -145,7 +145,7 @@ export function ExchangeScreen() {
 
         <div className="conversion-hero">
           <div className="conversion-hero__asset">
-            <AssetIcon symbol={quote.request.fromSymbol} size={36} />
+            <AssetIcon symbol={quote.request.fromSymbol} size={52} />
             <span className="tabular">
               {formatQty(quote.request.fromQuantity)} {quote.request.fromSymbol}
             </span>
@@ -154,7 +154,7 @@ export function ExchangeScreen() {
             <IconArrowDown size={18} />
           </div>
           <div className="conversion-hero__asset">
-            <AssetIcon symbol={quote.request.toSymbol} size={36} />
+            <AssetIcon symbol={quote.request.toSymbol} size={52} />
             <span className="tabular">
               {formatQty(quote.youReceiveQuantity)} {quote.request.toSymbol}
             </span>
@@ -211,14 +211,14 @@ export function ExchangeScreen() {
 
       <div className="conversion-hero">
         <div className="conversion-hero__asset">
-          <AssetIcon symbol={fromSymbol} size={36} />
+          <AssetIcon symbol={fromSymbol} size={52} />
           <span>{fromSymbol}</span>
         </div>
         <div className="conversion-hero__arrow">
           <IconArrowDown size={18} />
         </div>
         <div className="conversion-hero__asset">
-          <AssetIcon symbol={toSymbol} size={36} />
+          <AssetIcon symbol={toSymbol} size={52} />
           <span>{toSymbol}</span>
         </div>
       </div>

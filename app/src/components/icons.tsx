@@ -5,6 +5,8 @@ type IconProps = SVGProps<SVGSVGElement> & {
   size?: number;
 };
 
+const STROKE = 1.75;
+
 function BaseIcon({ size = 20, children, ...props }: IconProps & { children: ReactNode }) {
   return (
     <svg
@@ -13,7 +15,7 @@ function BaseIcon({ size = 20, children, ...props }: IconProps & { children: Rea
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={STROKE}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -27,7 +29,7 @@ function BaseIcon({ size = 20, children, ...props }: IconProps & { children: Rea
 export function IconHome(props: IconProps) {
   return (
     <BaseIcon {...props}>
-      <path d="M4.5 10.5 12 4l7.5 6.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-4V21H5.5a1 1 0 0 1-1-1v-9.5Z" />
+      <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-9.5Z" />
     </BaseIcon>
   );
 }
@@ -35,7 +37,7 @@ export function IconHome(props: IconProps) {
 export function IconActivity(props: IconProps) {
   return (
     <BaseIcon {...props}>
-      <path d="M4 12h3.2l2.1-6 3.4 12 2.2-6H20" />
+      <path d="M3 12h4l2.5-7 3.5 14L16 12h5" />
     </BaseIcon>
   );
 }
@@ -43,8 +45,10 @@ export function IconActivity(props: IconProps) {
 export function IconExchange(props: IconProps) {
   return (
     <BaseIcon {...props}>
-      <path d="M7 7h11l-2.5-2.5" />
-      <path d="M17 17H6l2.5 2.5" />
+      <path d="M16 3h5v5" />
+      <path d="M21 3 13 11" />
+      <path d="M8 21H3v-5" />
+      <path d="M3 21l8-8" />
     </BaseIcon>
   );
 }
@@ -52,8 +56,8 @@ export function IconExchange(props: IconProps) {
 export function IconAccounts(props: IconProps) {
   return (
     <BaseIcon {...props}>
-      <rect x="3.5" y="6" width="17" height="12" rx="2.5" />
-      <path d="M3.5 10.5h17" />
+      <rect x="3" y="6" width="18" height="12" rx="2.5" />
+      <path d="M3 10h18" />
     </BaseIcon>
   );
 }
@@ -62,7 +66,7 @@ export function IconSend(props: IconProps) {
   return (
     <BaseIcon {...props}>
       <path d="M12 19V5" />
-      <path d="m7.5 9.5 4.5-4.5 4.5 4.5" />
+      <path d="m7 10 5-5 5 5" />
     </BaseIcon>
   );
 }
@@ -71,7 +75,7 @@ export function IconReceive(props: IconProps) {
   return (
     <BaseIcon {...props}>
       <path d="M12 5v14" />
-      <path d="m7.5 14.5 4.5 4.5 4.5-4.5" />
+      <path d="m7 14 5 5 5-5" />
     </BaseIcon>
   );
 }
@@ -96,8 +100,8 @@ export function IconArrowDown(props: IconProps) {
 export function IconCopy(props: IconProps) {
   return (
     <BaseIcon {...props}>
-      <rect x="8" y="8" width="11" height="11" rx="2" />
-      <path d="M5 15V6.5A1.5 1.5 0 0 1 6.5 5H15" />
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M4 16V6a2 2 0 0 1 2-2h10" />
     </BaseIcon>
   );
 }
@@ -119,20 +123,21 @@ export function IconCheck(props: IconProps) {
 }
 
 const assetColors: Record<string, { bg: string; fg: string }> = {
-  BTC: { bg: '#F7931A', fg: '#ffffff' },
-  ETH: { bg: '#627EEA', fg: '#ffffff' },
-  USDT: { bg: '#26A17B', fg: '#ffffff' },
-  USDC: { bg: '#2775CA', fg: '#ffffff' },
+  BTC: { bg: '#e0912a', fg: '#ffffff' },
+  ETH: { bg: '#6578d0', fg: '#ffffff' },
+  USDT: { bg: '#3a9a7a', fg: '#ffffff' },
+  USDC: { bg: '#3a78b8', fg: '#ffffff' },
 };
 
 export function AssetIcon({
   symbol,
-  size = 36,
+  size = 44,
 }: {
   symbol: string;
   size?: number;
 }) {
-  const colors = assetColors[symbol] ?? { bg: '#111111', fg: '#ffffff' };
+  const colors = assetColors[symbol] ?? { bg: '#171614', fg: '#ffffff' };
+  const mark = size * 0.5;
   const style: CSSProperties = {
     width: size,
     height: size,
@@ -142,14 +147,15 @@ export function AssetIcon({
     display: 'inline-grid',
     placeItems: 'center',
     flexShrink: 0,
+    filter: 'saturate(0.9)',
   };
 
   return (
     <span className="asset-icon" style={style} aria-hidden="true">
-      {symbol === 'BTC' ? <BtcMark size={size * 0.52} /> : null}
-      {symbol === 'ETH' ? <EthMark size={size * 0.48} /> : null}
-      {symbol === 'USDT' ? <UsdtMark size={size * 0.5} /> : null}
-      {symbol === 'USDC' ? <UsdcMark size={size * 0.5} /> : null}
+      {symbol === 'BTC' ? <BtcMark size={mark} /> : null}
+      {symbol === 'ETH' ? <EthMark size={mark} /> : null}
+      {symbol === 'USDT' ? <UsdtMark size={mark} /> : null}
+      {symbol === 'USDC' ? <UsdcMark size={mark} /> : null}
       {!assetColors[symbol] ? (
         <span style={{ fontSize: size * 0.34, fontWeight: 600 }}>{symbol.slice(0, 1)}</span>
       ) : null}
@@ -193,20 +199,21 @@ const providerMeta: Record<
   ProviderType,
   { label: string; bg: string; fg: string; mark: string }
 > = {
-  bybit: { label: 'Bybit', bg: '#F7A600', fg: '#111111', mark: 'B' },
-  binance: { label: 'Binance', bg: '#F3BA2F', fg: '#111111', mark: '◆' },
-  non_custodial: { label: 'Wallet', bg: '#111111', fg: '#ffffff', mark: 'W' },
-  mock: { label: 'Mock', bg: '#5f5e59', fg: '#ffffff', mark: 'M' },
+  bybit: { label: 'Bybit', bg: '#e2a030', fg: '#171614', mark: 'B' },
+  binance: { label: 'Binance', bg: '#ddb13a', fg: '#171614', mark: '◆' },
+  non_custodial: { label: 'Wallet', bg: '#171614', fg: '#fbfaf7', mark: 'W' },
+  mock: { label: 'Mock', bg: '#6a675f', fg: '#fbfaf7', mark: 'M' },
 };
 
 export function ProviderIcon({
   type,
-  size = 40,
+  size = 44,
 }: {
   type: ProviderType;
   size?: number;
 }) {
   const meta = providerMeta[type] ?? providerMeta.mock;
+  const markSize = size * 0.42;
   return (
     <span
       className="provider-icon"
@@ -218,15 +225,16 @@ export function ProviderIcon({
         color: meta.fg,
         display: 'inline-grid',
         placeItems: 'center',
-        fontSize: size * 0.38,
+        fontSize: size * 0.36,
         fontWeight: 600,
         letterSpacing: '-0.02em',
         flexShrink: 0,
+        filter: 'saturate(0.9)',
       }}
       aria-hidden="true"
     >
       {type === 'binance' ? (
-        <svg width={size * 0.42} height={size * 0.42} viewBox="0 0 24 24" fill="currentColor">
+        <svg width={markSize} height={markSize} viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 3.2 14.8 6 12 8.8 9.2 6 12 3.2Zm0 5.6L16.4 13 12 17.4 7.6 13 12 8.8Zm5.6-2L20.4 9.6 18.2 11.8l-2.2-2.2 1.6-1.6ZM6.4 6.8 8.6 9 6.4 11.2 3.6 8.4 6.4 6.8Zm0 7.6L8.6 16.6 6.4 18.8 3.6 16 6.4 14.4Zm11.2 0L20.4 16 18.2 18.2l-2.2-2.2 1.6-1.6ZM12 15.6l2.8 2.8L12 21.2l-2.8-2.8L12 15.6Z" />
         </svg>
       ) : (
