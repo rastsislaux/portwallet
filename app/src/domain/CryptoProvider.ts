@@ -31,7 +31,7 @@ export interface CryptoProvider {
   disconnect(accountId: string): Promise<void>;
 
   listBalances(accountId: string): Promise<AssetBalance[]>;
-  listNetworks(assetSymbol: string): Promise<NetworkInfo[]>;
+  listNetworks(accountId: string, assetSymbol: string): Promise<NetworkInfo[]>;
   getTransactions(accountId: string): Promise<Transaction[]>;
 
   prepareSend(request: SendRequest): Promise<SendPreview>;

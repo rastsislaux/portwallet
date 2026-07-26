@@ -78,11 +78,15 @@ export function AssetDetailScreen() {
           {holdings.map((h) => {
             const account = accounts.find((a) => a.id === h.accountId);
             return (
-              <div key={h.accountId} className="grouped-row">
+              <div
+                key={`${h.accountId}-${h.product ?? 'default'}`}
+                className="grouped-row"
+              >
                 <ProviderIcon type={account?.providerType ?? 'mock'} size={36} />
                 <div className="grouped-row__body">
                   <div className="grouped-row__title">
                     {account?.nickname ?? 'Account'}
+                    {h.productLabel ? ` · ${h.productLabel}` : ''}
                   </div>
                   <div className="grouped-row__meta">
                     {account?.venueLabel}
@@ -98,6 +102,12 @@ export function AssetDetailScreen() {
           })}
         </div>
       </div>
+
+      {holdings.some((h) => h.product === 'EARN') ? (
+        <div className="notice notice--info">
+          Earn products are read-only in Portwallet. Stake and redeem in the Bybit app.
+        </div>
+      ) : null}
 
       <div className="section-block">
         <div className="section-label">Recent</div>

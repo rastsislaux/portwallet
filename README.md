@@ -9,12 +9,18 @@ See [`docs/design/`](docs/design/) for information architecture, monochrome wire
 ## Provider model
 
 ```ts
-interface CryptoProvider { /* connect, balances, send, receive, exchange, history */ }
-class MockCryptoProvider implements CryptoProvider { /* prototype */ }
-// Future: BybitCryptoProvider, BinanceCryptoProvider, NonCustodialCryptoProvider
+interface CryptoProvider { /* connect, balances, send, receive, exchange, history, cards */ }
+class BybitCryptoProvider implements CryptoProvider { /* live Bybit V5 */ }
+class MockCryptoProvider implements CryptoProvider { /* Binance / non-custodial prototype */ }
 ```
 
 Users can add **multiple providers**, including **multiple accounts of the same type**.
+
+### Bybit
+
+Connect from **Accounts** with API key, secret, and server (mainnet, testnet, or regional). Keys stay in the browser session only. On connect, Portwallet reads key permissions and blocks withdraw / transfer / exchange / card actions the key cannot perform.
+
+Supported products: Funding, UTA balances, Earn positions (view-only), receive, internal transfer, on-chain withdraw, convert/exchange, and Bybit Card (spend balance calculated from eligible funding coins).
 
 ## Run
 
@@ -29,7 +35,7 @@ cd app
 npm run build
 ```
 
-Prototype boots with two mock Bybit accounts so multi-account aggregation is visible immediately. Add Binance or a non-custodial wallet from **Accounts**.
+Start with an empty portfolio, then connect a Bybit account from **Accounts**. Binance and non-custodial remain mock prototypes.
 
 ## Deploy
 

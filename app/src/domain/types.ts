@@ -11,6 +11,19 @@ export type TransactionKind =
   | 'deposit'
   | 'exchange';
 
+/** Bybit wallet buckets (and future venue analogues). */
+export type WalletProduct = 'FUND' | 'UNIFIED' | 'EARN';
+
+export type BybitServerId =
+  | 'mainnet'
+  | 'testnet'
+  | 'mainnet_nl'
+  | 'mainnet_eu'
+  | 'mainnet_tr'
+  | 'mainnet_ae'
+  | 'mainnet_kz'
+  | 'mainnet_id';
+
 export interface WalletAccount {
   id: string;
   nickname: string;
@@ -19,6 +32,22 @@ export interface WalletAccount {
   custody: CustodyKind;
   venueLabel: string;
   connectedAt: string;
+  /** Selected Bybit API host when providerType is bybit. */
+  bybitServer?: BybitServerId;
+  /** Snapshot of API key capabilities after connect. */
+  permissions?: ProviderPermissionSnapshot;
+}
+
+export interface ProviderPermissionSnapshot {
+  readOnly: boolean;
+  canWithdraw: boolean;
+  canTransfer: boolean;
+  canExchange: boolean;
+  canEarnRead: boolean;
+  canCard: boolean;
+  canDepositRead: boolean;
+  uta: boolean;
+  isMaster: boolean;
 }
 
 export interface AssetBalance {
@@ -28,6 +57,9 @@ export interface AssetBalance {
   quantity: number;
   fiatValueUsd: number;
   accountId: string;
+  /** Venue wallet bucket this balance belongs to. */
+  product?: WalletProduct;
+  productLabel?: string;
 }
 
 export interface AggregatedAsset {
@@ -43,6 +75,11 @@ export interface NetworkInfo {
   id: string;
   name: string;
   assetSymbol: string;
+  /** Bybit chain code used by deposit/withdraw APIs. */
+  chain?: string;
+  withdrawFee?: number;
+  depositEnabled?: boolean;
+  withdrawEnabled?: boolean;
 }
 
 export interface Transaction {
@@ -60,6 +97,7 @@ export interface Transaction {
   createdAt: string;
   failureReason?: string;
   providerLabel: string;
+  product?: WalletProduct;
 }
 
 export interface SendRequest {
@@ -69,6 +107,10 @@ export interface SendRequest {
   destination: string;
   networkId: string;
   kind: Extract<TransactionKind, 'transfer' | 'internal' | 'withdrawal'>;
+  /** Source wallet for withdraw / internal transfer. */
+  fromProduct?: WalletProduct;
+  /** Destination wallet for internal transfer (FUND ↔ UNIFIED). */
+  toProduct?: WalletProduct;
 }
 
 export interface SendPreview {
@@ -89,6 +131,8 @@ export interface ReceiveAddress {
   networkName: string;
   address: string;
   warning: string;
+  tag?: string;
+  product?: WalletProduct;
 }
 
 export interface ExchangeRequest {
@@ -96,6 +140,8 @@ export interface ExchangeRequest {
   fromSymbol: string;
   toSymbol: string;
   fromQuantity: number;
+  /** Convert wallet: FUND or UNIFIED. */
+  product?: Exclude<WalletProduct, 'EARN'>;
 }
 
 export interface ExchangeQuote {
@@ -108,6 +154,8 @@ export interface ExchangeQuote {
   minFromQuantity: number;
   spreadBps: number;
   providerLabel: string;
+  /** Bybit quote id when quoting live. */
+  venueQuoteId?: string;
 }
 
 export interface OperationResult {
@@ -121,6 +169,9 @@ export interface ConnectConfig {
   nickname: string;
   /** Distinguishes multiple accounts of the same provider type */
   labelHint?: string;
+  apiKey?: string;
+  apiSecret?: string;
+  bybitServer?: BybitServerId;
 }
 
 export type CardNetwork = 'visa' | 'mastercard';
@@ -192,3 +243,9 @@ export interface FundingAssetBalance {
   /** Whether this asset can fund card spend for the account. */
   cardEligible: boolean;
 }
+
+export const WALLET_PRODUCT_LABELS: Record<WalletProduct, string> = {
+  FUND: 'Funding',
+  UNIFIED: 'UTA',
+  EARN: 'Earn',
+};

@@ -6,10 +6,14 @@ import type {
   OperationResult,
   SendPreview,
   TransactionKind,
+  WalletProduct,
 } from '../domain/types';
+import { WALLET_PRODUCT_LABELS } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
 type Step = 'form' | 'review' | 'result';
+
+const MOVABLE_PRODUCTS: WalletProduct[] = ['FUND', 'UNIFIED'];
 
 export function SendScreen() {
   const navigate = useNavigate();
@@ -35,6 +39,8 @@ export function SendScreen() {
   const [kind, setKind] = useState<
     Extract<TransactionKind, 'transfer' | 'internal' | 'withdrawal'>
   >('withdrawal');
+  const [fromProduct, setFromProduct] = useState<WalletProduct>('FUND');
+  const [toProduct, setToProduct] = useState<WalletProduct>('UNIFIED');
   const [networks, setNetworks] = useState<{ id: string; name: string }[]>([]);
   const [networkId, setNetworkId] = useState('');
   const [preview, setPreview] = useState<SendPreview | null>(null);
@@ -50,6 +56,23 @@ export function SendScreen() {
     [accounts, balances, asset],
   );
 
+  const selectedAccount = accounts.find((a) => a.id === accountId);
+  const isBybit = selectedAccount?.providerType === 'bybit';
+
+  const productOptions = useMemo(() => {
+    const products = balances
+      .filter(
+        (b) =>
+          b.accountId === accountId &&
+          b.symbol === asset &&
+          b.product &&
+          MOVABLE_PRODUCTS.includes(b.product),
+      )
+      .map((b) => b.product!);
+    const unique = [...new Set(products)];
+    return unique.length > 0 ? unique : (['FUND'] as WalletProduct[]);
+  }, [balances, accountId, asset]);
+
   useEffect(() => {
     if (!assetSymbols.includes(asset) && assetSymbols[0]) {
       setAsset(assetSymbols[0]);
@@ -64,20 +87,44 @@ export function SendScreen() {
   }, [accountId, accountOptions]);
 
   useEffect(() => {
+    if (!productOptions.includes(fromProduct)) {
+      setFromProduct(productOptions[0] ?? 'FUND');
+    }
+  }, [fromProduct, productOptions]);
+
+  useEffect(() => {
+    if (kind === 'internal' && toProduct === fromProduct) {
+      const alt = MOVABLE_PRODUCTS.find((p) => p !== fromProduct) ?? 'UNIFIED';
+      setToProduct(alt);
+    }
+  }, [kind, fromProduct, toProduct]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!accountId) return;
-      const list = await listNetworks(accountId, asset);
-      if (cancelled) return;
-      setNetworks(list);
-      setNetworkId((current) =>
-        list.some((n) => n.id === current) ? current : (list[0]?.id ?? ''),
-      );
+      if (!accountId || kind === 'internal') {
+        setNetworks([]);
+        setNetworkId('internal');
+        return;
+      }
+      try {
+        const list = await listNetworks(accountId, asset);
+        if (cancelled) return;
+        setNetworks(list);
+        setNetworkId((current) =>
+          list.some((n) => n.id === current) ? current : (list[0]?.id ?? ''),
+        );
+      } catch (e) {
+        if (!cancelled) {
+          setNetworks([]);
+          setError(e instanceof Error ? e.message : 'Could not load networks');
+        }
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [asset, accountId, listNetworks]);
+  }, [asset, accountId, listNetworks, kind]);
 
   function onAssetChange(next: string) {
     setAsset(next);
@@ -86,19 +133,39 @@ export function SendScreen() {
   async function onContinue() {
     setError(null);
     const qty = Number(quantity);
-    if (!accountId || !destination || !networkId || !(qty > 0)) {
-      setError('Fill asset, account, amount, network, and destination.');
+    if (!accountId || !(qty > 0)) {
+      setError('Fill asset, account, and amount.');
       return;
     }
+    if (kind === 'internal') {
+      if (!toProduct || toProduct === fromProduct) {
+        setError('Choose a different destination wallet.');
+        return;
+      }
+    } else if (!destination.trim() || !networkId) {
+      setError('Fill network and destination.');
+      return;
+    }
+
+    if (fromProduct === 'EARN') {
+      setError(
+        'Earn products are read-only in Portwallet. Move funds to Funding or UTA in Bybit first.',
+      );
+      return;
+    }
+
     setBusy(true);
     try {
       const p = await prepareSend({
         accountId,
         assetSymbol: asset,
         quantity: qty,
-        destination,
-        networkId,
+        destination:
+          kind === 'internal' ? toProduct : destination.trim(),
+        networkId: kind === 'internal' ? 'internal' : networkId,
         kind,
+        fromProduct: isBybit ? fromProduct : undefined,
+        toProduct: kind === 'internal' ? toProduct : undefined,
       });
       setPreview(p);
       setStep('review');
@@ -214,6 +281,13 @@ export function SendScreen() {
     );
   }
 
+  const blockedByPermissions =
+    isBybit && selectedAccount?.permissions
+      ? kind === 'withdrawal' || kind === 'transfer'
+        ? !selectedAccount.permissions.canWithdraw
+        : !selectedAccount.permissions.canTransfer
+      : false;
+
   return (
     <section className="screen">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
@@ -259,35 +333,87 @@ export function SendScreen() {
         </select>
       </div>
 
+      {isBybit ? (
+        <div className="field">
+          <label htmlFor="send-from-product">From wallet</label>
+          <select
+            id="send-from-product"
+            value={fromProduct}
+            onChange={(e) => setFromProduct(e.target.value as WalletProduct)}
+          >
+            {productOptions.map((p) => (
+              <option key={p} value={p}>
+                {WALLET_PRODUCT_LABELS[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       <div className="field">
         <label htmlFor="send-kind">Type</label>
         <select
           id="send-kind"
           value={kind}
-          onChange={(e) =>
-            setKind(e.target.value as typeof kind)
-          }
+          onChange={(e) => setKind(e.target.value as typeof kind)}
         >
           <option value="withdrawal">Withdrawal · on-chain</option>
-          <option value="internal">Internal · exchange move</option>
-          <option value="transfer">Transfer · between contacts</option>
+          <option value="internal">Internal · Funding ↔ UTA</option>
+          <option value="transfer">Transfer · Bybit internal</option>
         </select>
       </div>
 
-      <div className="field">
-        <label htmlFor="send-network">Network</label>
-        <select
-          id="send-network"
-          value={networkId}
-          onChange={(e) => setNetworkId(e.target.value)}
-        >
-          {networks.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {kind === 'internal' ? (
+        <div className="field">
+          <label htmlFor="send-to-product">To wallet</label>
+          <select
+            id="send-to-product"
+            value={toProduct}
+            onChange={(e) => setToProduct(e.target.value as WalletProduct)}
+          >
+            {MOVABLE_PRODUCTS.filter((p) => p !== fromProduct).map((p) => (
+              <option key={p} value={p}>
+                {WALLET_PRODUCT_LABELS[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <>
+          <div className="field">
+            <label htmlFor="send-network">Network</label>
+            <select
+              id="send-network"
+              value={networkId}
+              onChange={(e) => setNetworkId(e.target.value)}
+              disabled={kind === 'transfer'}
+            >
+              {kind === 'transfer' ? (
+                <option value="internal">Bybit internal</option>
+              ) : (
+                networks.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="send-dest">Destination</label>
+            <textarea
+              id="send-dest"
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              placeholder={
+                kind === 'transfer'
+                  ? 'Bybit UID or internal address'
+                  : 'On-chain address'
+              }
+            />
+          </div>
+        </>
+      )}
 
       <div className="field">
         <label htmlFor="send-amount">Amount</label>
@@ -301,15 +427,12 @@ export function SendScreen() {
         />
       </div>
 
-      <div className="field">
-        <label htmlFor="send-dest">Destination</label>
-        <textarea
-          id="send-dest"
-          value={destination}
-          onChange={(e) => setDestination(e.target.value)}
-          placeholder="Address or account identifier"
-        />
-      </div>
+      {blockedByPermissions ? (
+        <div className="notice notice--danger">
+          This API key cannot perform this action. Enable the required Wallet
+          permission in Bybit, then reconnect.
+        </div>
+      ) : null}
 
       {error ? <div className="notice notice--danger">{error}</div> : null}
 
@@ -317,7 +440,7 @@ export function SendScreen() {
         type="button"
         className="btn btn--primary btn--block"
         onClick={() => void onContinue()}
-        disabled={busy}
+        disabled={busy || blockedByPermissions}
       >
         Review
       </button>
@@ -327,6 +450,6 @@ export function SendScreen() {
 
 function labelKind(kind: string) {
   if (kind === 'withdrawal') return 'Withdrawal · on-chain';
-  if (kind === 'internal') return 'Internal · exchange move';
-  return 'Transfer';
+  if (kind === 'internal') return 'Internal · Funding ↔ UTA';
+  return 'Transfer · Bybit internal';
 }
