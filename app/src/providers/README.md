@@ -8,7 +8,7 @@ Each `connect()` call creates a distinct `WalletAccount`. The registry binds man
 
 ## Bybit
 
-Connect with API key + secret + server (mainnet / testnet / regional). Credentials stay in session memory only.
+Connect with API key + secret + server (mainnet / testnet / regional). Credentials are persisted in browser local storage by the wallet layer and restored on reload.
 
 One connect creates separate Portwallet accounts for Funding, UTA, and Earn when the key/wallet types allow them (shared credentials via `providerInstanceId`).
 

@@ -10,6 +10,8 @@ export function AccountsScreen() {
   const {
     accounts,
     availableProviderTypes,
+    restoreFailures,
+    discardSavedAccount,
     addAccount,
     removeAccount,
   } = useWallet();
@@ -112,6 +114,35 @@ export function AccountsScreen() {
           </div>
         ))}
       </div>
+
+      {restoreFailures.length > 0 ? (
+        <div className="notice notice--danger" style={{ marginTop: 8 }}>
+          {restoreFailures.map((failure) => (
+            <div
+              key={failure.id}
+              style={{
+                display: 'flex',
+                gap: 12,
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                marginTop: failure === restoreFailures[0] ? 0 : 10,
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600 }}>{failure.nickname}</div>
+                <div>Could not restore saved credentials: {failure.message}</div>
+              </div>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => discardSavedAccount(failure.id)}
+              >
+                Discard
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {accounts.length === 0 ? (
         <div className="empty" style={{ marginTop: 8 }}>
@@ -219,8 +250,9 @@ export function AccountsScreen() {
                   />
                 </div>
                 <div className="notice notice--info" style={{ margin: 0 }}>
-                  Keys stay in this browser session only. One connect creates Funding,
-                  UTA, and Earn accounts when permissions allow. Earn is view-only.
+                  Keys are saved in this browser&apos;s local storage so they survive
+                  reloads. One connect creates Funding, UTA, and Earn accounts when
+                  permissions allow. Earn is view-only.
                 </div>
               </>
             ) : null}
@@ -255,7 +287,7 @@ export function AccountsScreen() {
             <h2 className="screen-title screen-title--sheet">Remove account?</h2>
             <p style={{ margin: 0, color: 'var(--ink-secondary)', fontSize: 15, lineHeight: 1.4 }}>
               This only disconnects the account from Portwallet. Funds remain with the
-              provider. Session API keys for this account are discarded.
+              provider. Saved API keys for this account are removed from local storage.
             </p>
             <div className="stack-actions">
               <button

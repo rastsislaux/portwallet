@@ -27,6 +27,13 @@ import type {
   WalletAccount,
 } from '../domain/types';
 import { ProviderRegistry } from '../providers/registry';
+import {
+  addSavedAccount,
+  createSavedAccountId,
+  readSavedAccounts,
+  removeSavedAccount,
+  type SavedAccountCredentials,
+} from './accountStorage';
 
 export type AccountFilter = 'all' | string;
 
@@ -34,6 +41,12 @@ export type AccountCardStatus = {
   account: WalletAccount;
   capability: CardCapability;
   cards: ProviderCard[];
+};
+
+export type RestoreFailure = {
+  id: string;
+  nickname: string;
+  message: string;
 };
 
 type WalletContextValue = {
@@ -52,6 +65,8 @@ type WalletContextValue = {
   fundingByAccountId: Record<string, FundingAssetBalance[]>;
   custodySummary: string;
   availableProviderTypes: ReturnType<ProviderRegistry['listAvailableTypes']>;
+  restoreFailures: RestoreFailure[];
+  discardSavedAccount: (savedId: string) => void;
   refresh: () => Promise<void>;
   addAccount: (
     type: ProviderType,
@@ -140,6 +155,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [fundingByAccountId, setFundingByAccountId] = useState<
     Record<string, FundingAssetBalance[]>
   >({});
+  const [restoreFailures, setRestoreFailures] = useState<RestoreFailure[]>([]);
+  const instanceToSavedId = useRef(new Map<string, string>());
 
   const selectedAccounts = useMemo(() => {
     if (filter === 'all') return accounts;
@@ -190,7 +207,42 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (didBootstrap.current) return;
     didBootstrap.current = true;
-    setReady(true);
+
+    void (async () => {
+      const saved = readSavedAccounts();
+      const restored: WalletAccount[] = [];
+      const failures: RestoreFailure[] = [];
+
+      for (const entry of saved) {
+        try {
+          const provider = registry.getFactory(entry.providerType);
+          const connected = await provider.connect({
+            nickname: entry.nickname,
+            apiKey: entry.apiKey,
+            apiSecret: entry.apiSecret,
+            bybitServer: entry.bybitServer,
+          });
+          for (const account of connected) {
+            registry.bindAccount(account.id, provider);
+          }
+          if (connected[0]) {
+            instanceToSavedId.current.set(connected[0].providerInstanceId, entry.id);
+          }
+          restored.push(...connected);
+        } catch (err) {
+          failures.push({
+            id: entry.id,
+            nickname: entry.nickname,
+            message:
+              err instanceof Error ? err.message : 'Could not restore account',
+          });
+        }
+      }
+
+      setAccounts(restored);
+      setRestoreFailures(failures);
+      setReady(true);
+    })();
   }, []);
 
   useEffect(() => {
@@ -215,22 +267,54 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       for (const account of connected) {
         registry.bindAccount(account.id, provider);
       }
+
+      const saved: SavedAccountCredentials = {
+        id: createSavedAccountId(),
+        providerType: type,
+        nickname: config.nickname.trim(),
+        apiKey: config.apiKey?.trim() || undefined,
+        apiSecret: config.apiSecret?.trim() || undefined,
+        bybitServer: config.bybitServer,
+      };
+      addSavedAccount(saved);
+      if (connected[0]) {
+        instanceToSavedId.current.set(connected[0].providerInstanceId, saved.id);
+      }
+
       setAccounts((prev) => [...prev, ...connected]);
       return connected;
     },
     [],
   );
 
-  const removeAccount = useCallback(
-    async (accountId: string) => {
-      const provider = registry.getForAccount(accountId);
-      await provider.disconnect(accountId);
-      registry.unbindAccount(accountId);
-      setAccounts((prev) => prev.filter((a) => a.id !== accountId));
-      setFilter((f) => (f === accountId ? 'all' : f));
-    },
-    [],
-  );
+  const removeAccount = useCallback(async (accountId: string) => {
+    const provider = registry.getForAccount(accountId);
+    await provider.disconnect(accountId);
+    registry.unbindAccount(accountId);
+    setAccounts((prev) => {
+      const removed = prev.find((a) => a.id === accountId);
+      const next = prev.filter((a) => a.id !== accountId);
+      if (removed) {
+        const stillConnected = next.some(
+          (a) => a.providerInstanceId === removed.providerInstanceId,
+        );
+        if (!stillConnected) {
+          const savedId = instanceToSavedId.current.get(removed.providerInstanceId);
+          if (savedId) {
+            removeSavedAccount(savedId);
+            instanceToSavedId.current.delete(removed.providerInstanceId);
+          }
+        }
+      }
+      return next;
+    });
+    setFilter((f) => (f === accountId ? 'all' : f));
+  }, []);
+
+  const discardSavedAccount = useCallback((savedId: string) => {
+    removeSavedAccount(savedId);
+    setRestoreFailures((prev) => prev.filter((row) => row.id !== savedId));
+  }, []);
 
   const prepareSend = useCallback(
     (request: SendRequest) =>
@@ -298,6 +382,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fundingByAccountId,
       custodySummary,
       availableProviderTypes,
+      restoreFailures,
+      discardSavedAccount,
       refresh,
       addAccount,
       removeAccount,
@@ -323,6 +409,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       fundingByAccountId,
       custodySummary,
       availableProviderTypes,
+      restoreFailures,
+      discardSavedAccount,
       refresh,
       addAccount,
       removeAccount,

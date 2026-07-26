@@ -18,7 +18,7 @@ Users can add **multiple providers**, including **multiple accounts of the same 
 
 ### Bybit
 
-Connect from **Accounts** with API key, secret, and server (mainnet, testnet, or regional). Keys stay in the browser session only. On connect, Portwallet reads key permissions and blocks withdraw / transfer / exchange / card actions the key cannot perform.
+Connect from **Accounts** with API key, secret, and server (mainnet, testnet, or regional). Keys are stored in the browser's local storage so connected accounts survive reloads. On connect, Portwallet reads key permissions and blocks withdraw / transfer / exchange / card actions the key cannot perform.
 
 One Bybit connect creates separate accounts for Funding, UTA, and Earn (when permitted). Supports receive, internal transfer, on-chain withdraw, convert/exchange, and Bybit Card on the Funding account (spend balance from eligible funding coins). Earn is view-only.
 
