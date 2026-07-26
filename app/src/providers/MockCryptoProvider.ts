@@ -315,7 +315,7 @@ export class MockCryptoProvider implements CryptoProvider {
     this.custody = type === 'non_custodial' ? 'non_custodial' : 'custodial';
   }
 
-  async connect(config: ConnectConfig): Promise<WalletAccount> {
+  async connect(config: ConnectConfig): Promise<WalletAccount[]> {
     const instanceIndex = this.instanceCount++;
     const providerInstanceId = `${this.type}_inst_${instanceIndex}_${Date.now()}`;
     const account: WalletAccount = {
@@ -360,7 +360,7 @@ export class MockCryptoProvider implements CryptoProvider {
       this.cardOperations.set(account.id, []);
     }
 
-    return account;
+    return [account];
   }
 
   private buildCards(

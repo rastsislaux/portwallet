@@ -8,12 +8,9 @@ import type {
   TransactionKind,
   WalletProduct,
 } from '../domain/types';
-import { WALLET_PRODUCT_LABELS } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
 type Step = 'form' | 'review' | 'result';
-
-const MOVABLE_PRODUCTS: WalletProduct[] = ['FUND', 'UNIFIED'];
 
 export function SendScreen() {
   const navigate = useNavigate();
@@ -36,11 +33,10 @@ export function SendScreen() {
   const [accountId, setAccountId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [destination, setDestination] = useState('');
+  const [destinationAccountId, setDestinationAccountId] = useState('');
   const [kind, setKind] = useState<
     Extract<TransactionKind, 'transfer' | 'internal' | 'withdrawal'>
   >('withdrawal');
-  const [fromProduct, setFromProduct] = useState<WalletProduct>('FUND');
-  const [toProduct, setToProduct] = useState<WalletProduct>('UNIFIED');
   const [networks, setNetworks] = useState<{ id: string; name: string }[]>([]);
   const [networkId, setNetworkId] = useState('');
   const [preview, setPreview] = useState<SendPreview | null>(null);
@@ -50,28 +46,28 @@ export function SendScreen() {
 
   const accountOptions = useMemo(
     () =>
-      accounts.filter((a) =>
-        balances.some((b) => b.accountId === a.id && b.symbol === asset),
+      accounts.filter(
+        (a) =>
+          a.product !== 'EARN' &&
+          balances.some((b) => b.accountId === a.id && b.symbol === asset),
       ),
     [accounts, balances, asset],
   );
 
   const selectedAccount = accounts.find((a) => a.id === accountId);
+  const fromProduct = selectedAccount?.product;
   const isBybit = selectedAccount?.providerType === 'bybit';
 
-  const productOptions = useMemo(() => {
-    const products = balances
-      .filter(
-        (b) =>
-          b.accountId === accountId &&
-          b.symbol === asset &&
-          b.product &&
-          MOVABLE_PRODUCTS.includes(b.product),
-      )
-      .map((b) => b.product!);
-    const unique = [...new Set(products)];
-    return unique.length > 0 ? unique : (['FUND'] as WalletProduct[]);
-  }, [balances, accountId, asset]);
+  const siblingAccounts = useMemo(() => {
+    if (!selectedAccount) return [];
+    return accounts.filter(
+      (a) =>
+        a.id !== selectedAccount.id &&
+        a.providerInstanceId === selectedAccount.providerInstanceId &&
+        (a.product === 'FUND' || a.product === 'UNIFIED') &&
+        a.product !== selectedAccount.product,
+    );
+  }, [accounts, selectedAccount]);
 
   useEffect(() => {
     if (!assetSymbols.includes(asset) && assetSymbols[0]) {
@@ -87,24 +83,18 @@ export function SendScreen() {
   }, [accountId, accountOptions]);
 
   useEffect(() => {
-    if (!productOptions.includes(fromProduct)) {
-      setFromProduct(productOptions[0] ?? 'FUND');
+    const stillValid = siblingAccounts.some((a) => a.id === destinationAccountId);
+    if (!stillValid) {
+      setDestinationAccountId(siblingAccounts[0]?.id ?? '');
     }
-  }, [fromProduct, productOptions]);
-
-  useEffect(() => {
-    if (kind === 'internal' && toProduct === fromProduct) {
-      const alt = MOVABLE_PRODUCTS.find((p) => p !== fromProduct) ?? 'UNIFIED';
-      setToProduct(alt);
-    }
-  }, [kind, fromProduct, toProduct]);
+  }, [destinationAccountId, siblingAccounts]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!accountId || kind === 'internal') {
+      if (!accountId || kind === 'internal' || kind === 'transfer') {
         setNetworks([]);
-        setNetworkId('internal');
+        setNetworkId(kind === 'transfer' ? 'internal' : 'internal');
         return;
       }
       try {
@@ -126,10 +116,6 @@ export function SendScreen() {
     };
   }, [asset, accountId, listNetworks, kind]);
 
-  function onAssetChange(next: string) {
-    setAsset(next);
-  }
-
   async function onContinue() {
     setError(null);
     const qty = Number(quantity);
@@ -137,20 +123,34 @@ export function SendScreen() {
       setError('Fill asset, account, and amount.');
       return;
     }
-    if (kind === 'internal') {
-      if (!toProduct || toProduct === fromProduct) {
-        setError('Choose a different destination wallet.');
-        return;
-      }
-    } else if (!destination.trim() || !networkId) {
-      setError('Fill network and destination.');
-      return;
-    }
-
     if (fromProduct === 'EARN') {
       setError(
         'Earn products are read-only in Portwallet. Move funds to Funding or UTA in Bybit first.',
       );
+      return;
+    }
+
+    let toProduct: WalletProduct | undefined;
+    let dest = destination.trim();
+    let net = networkId;
+
+    if (kind === 'internal') {
+      const sibling = accounts.find((a) => a.id === destinationAccountId);
+      if (!sibling?.product || sibling.product === fromProduct) {
+        setError('Choose a different destination wallet.');
+        return;
+      }
+      toProduct = sibling.product;
+      dest = sibling.id;
+      net = 'internal';
+    } else if (kind === 'transfer') {
+      if (!dest) {
+        setError('Enter a Bybit UID or internal address.');
+        return;
+      }
+      net = 'internal';
+    } else if (!dest || !net) {
+      setError('Fill network and destination.');
       return;
     }
 
@@ -160,12 +160,11 @@ export function SendScreen() {
         accountId,
         assetSymbol: asset,
         quantity: qty,
-        destination:
-          kind === 'internal' ? toProduct : destination.trim(),
-        networkId: kind === 'internal' ? 'internal' : networkId,
+        destination: dest,
+        networkId: net,
         kind,
-        fromProduct: isBybit ? fromProduct : undefined,
-        toProduct: kind === 'internal' ? toProduct : undefined,
+        fromProduct,
+        toProduct,
       });
       setPreview(p);
       setStep('review');
@@ -228,7 +227,11 @@ export function SendScreen() {
 
         <div className="section-block">
           <div className="section-label">To</div>
-          <div style={{ wordBreak: 'break-all', fontSize: 15 }}>{preview.request.destination}</div>
+          <div style={{ wordBreak: 'break-all', fontSize: 15 }}>
+            {preview.request.kind === 'internal'
+              ? preview.networkName
+              : preview.request.destination}
+          </div>
           <div className="muted" style={{ fontSize: 13 }}>
             {preview.networkName} · {labelKind(preview.request.kind)}
           </div>
@@ -307,7 +310,7 @@ export function SendScreen() {
           <select
             id="send-asset"
             value={asset}
-            onChange={(e) => onAssetChange(e.target.value)}
+            onChange={(e) => setAsset(e.target.value)}
           >
             {assetSymbols.map((s) => (
               <option key={s} value={s}>
@@ -327,28 +330,11 @@ export function SendScreen() {
         >
           {accountOptions.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.nickname} · {a.venueLabel}
+              {a.nickname}
             </option>
           ))}
         </select>
       </div>
-
-      {isBybit ? (
-        <div className="field">
-          <label htmlFor="send-from-product">From wallet</label>
-          <select
-            id="send-from-product"
-            value={fromProduct}
-            onChange={(e) => setFromProduct(e.target.value as WalletProduct)}
-          >
-            {productOptions.map((p) => (
-              <option key={p} value={p}>
-                {WALLET_PRODUCT_LABELS[p]}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
 
       <div className="field">
         <label htmlFor="send-kind">Type</label>
@@ -365,40 +351,42 @@ export function SendScreen() {
 
       {kind === 'internal' ? (
         <div className="field">
-          <label htmlFor="send-to-product">To wallet</label>
+          <label htmlFor="send-to-account">To account</label>
           <select
-            id="send-to-product"
-            value={toProduct}
-            onChange={(e) => setToProduct(e.target.value as WalletProduct)}
+            id="send-to-account"
+            value={destinationAccountId}
+            onChange={(e) => setDestinationAccountId(e.target.value)}
           >
-            {MOVABLE_PRODUCTS.filter((p) => p !== fromProduct).map((p) => (
-              <option key={p} value={p}>
-                {WALLET_PRODUCT_LABELS[p]}
+            {siblingAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nickname}
               </option>
             ))}
           </select>
+          {siblingAccounts.length === 0 ? (
+            <div className="notice notice--warning" style={{ marginTop: 8 }}>
+              No sibling Funding/UTA account is connected for this key.
+            </div>
+          ) : null}
         </div>
       ) : (
         <>
-          <div className="field">
-            <label htmlFor="send-network">Network</label>
-            <select
-              id="send-network"
-              value={networkId}
-              onChange={(e) => setNetworkId(e.target.value)}
-              disabled={kind === 'transfer'}
-            >
-              {kind === 'transfer' ? (
-                <option value="internal">Bybit internal</option>
-              ) : (
-                networks.map((n) => (
+          {kind === 'withdrawal' ? (
+            <div className="field">
+              <label htmlFor="send-network">Network</label>
+              <select
+                id="send-network"
+                value={networkId}
+                onChange={(e) => setNetworkId(e.target.value)}
+              >
+                {networks.map((n) => (
                   <option key={n.id} value={n.id}>
                     {n.name}
                   </option>
-                ))
-              )}
-            </select>
-          </div>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="field">
             <label htmlFor="send-dest">Destination</label>
             <textarea

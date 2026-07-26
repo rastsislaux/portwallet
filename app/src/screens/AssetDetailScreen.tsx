@@ -103,7 +103,10 @@ export function AssetDetailScreen() {
         </div>
       </div>
 
-      {holdings.some((h) => h.product === 'EARN') ? (
+      {holdings.some((h) => {
+        const account = accounts.find((a) => a.id === h.accountId);
+        return h.product === 'EARN' || account?.product === 'EARN';
+      }) ? (
         <div className="notice notice--info">
           Earn products are read-only in Portwallet. Stake and redeem in the Bybit app.
         </div>

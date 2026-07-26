@@ -56,7 +56,7 @@ type WalletContextValue = {
   addAccount: (
     type: ProviderType,
     config: ConnectConfig,
-  ) => Promise<WalletAccount>;
+  ) => Promise<WalletAccount[]>;
   removeAccount: (accountId: string) => Promise<void>;
   prepareSend: (request: SendRequest) => Promise<SendPreview>;
   submitSend: (accountId: string, previewId: string) => Promise<OperationResult>;
@@ -211,10 +211,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const addAccount = useCallback(
     async (type: ProviderType, config: ConnectConfig) => {
       const provider = registry.getFactory(type);
-      const account = await provider.connect(config);
-      registry.bindAccount(account.id, provider);
-      setAccounts((prev) => [...prev, account]);
-      return account;
+      const connected = await provider.connect(config);
+      for (const account of connected) {
+        registry.bindAccount(account.id, provider);
+      }
+      setAccounts((prev) => [...prev, ...connected]);
+      return connected;
     },
     [],
   );

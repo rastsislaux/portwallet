@@ -10,9 +10,11 @@ Each `connect()` call creates a distinct `WalletAccount`. The registry binds man
 
 Connect with API key + secret + server (mainnet / testnet / regional). Credentials stay in session memory only.
 
+One connect creates separate Portwallet accounts for Funding, UTA, and Earn when the key/wallet types allow them (shared credentials via `providerInstanceId`).
+
 On connect, the provider calls `/v5/user/query-api` and blocks actions that the key cannot perform (`Withdraw`, `AccountTransfer`, `ExchangeHistory`, `Earn`, `BitCard`, read-only).
 
-Earn positions are listed for portfolio view; stake/redeem is not available in the app.
+Earn accounts are view-only; stake/redeem is not available in the app. Bybit Card is attached to the Funding account.
 
 ## Cards
 

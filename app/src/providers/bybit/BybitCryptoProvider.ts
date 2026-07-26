@@ -32,12 +32,22 @@ import {
 } from './permissions';
 
 const BYBIT_CARD_ELIGIBLE = new Set(['USDT', 'USDC']);
+const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'FDUSD', 'USDE']);
 
-type Session = {
-  account: WalletAccount;
+type Connection = {
+  id: string;
   client: BybitRestClient;
   permissions: ProviderPermissionSnapshot;
   coinNames: Map<string, string>;
+  bybitServer: BybitServerId;
+  priceCache: Map<string, number>;
+  priceCachedAt: number;
+};
+
+type Session = {
+  account: WalletAccount;
+  connectionId: string;
+  product: WalletProduct;
 };
 
 type CoinChain = {
@@ -114,20 +124,21 @@ function sumEligibleFunding(funding: FundingAssetBalance[]): {
 }
 
 /**
- * Real Bybit V5 provider. Credentials live only in session memory for the
- * connected WalletAccount (entered in the UI, never persisted by this class).
+ * Real Bybit V5 provider. One API-key connect creates separate Funding / UTA /
+ * Earn accounts that share credentials in memory.
  */
 export class BybitCryptoProvider implements CryptoProvider {
   readonly type: ProviderType = 'bybit';
   readonly custody: CustodyKind = 'custodial';
   readonly venueLabel = 'Bybit';
 
+  private connections = new Map<string, Connection>();
   private sessions = new Map<string, Session>();
   private sendPreviews = new Map<string, SendPreviewState>();
   private exchangeQuotes = new Map<string, ExchangeQuoteState>();
   private coinInfoCache = new Map<string, CoinInfoRow[]>();
 
-  async connect(config: ConnectConfig): Promise<WalletAccount> {
+  async connect(config: ConnectConfig): Promise<WalletAccount[]> {
     const apiKey = config.apiKey?.trim();
     const apiSecret = config.apiSecret?.trim();
     const bybitServer: BybitServerId = config.bybitServer ?? 'mainnet';
@@ -139,30 +150,62 @@ export class BybitCryptoProvider implements CryptoProvider {
     const client = new BybitRestClient(apiKey, apiSecret, bybitServer);
     const keyInfo = await client.get<BybitApiKeyInfo>('/v5/user/query-api');
     const permissions = parseBybitPermissions(keyInfo);
+    const walletTypes = await this.resolveWalletTypes(client, permissions);
 
-    const account: WalletAccount = {
-      id: nextId('acct'),
-      nickname: config.nickname,
-      providerType: 'bybit',
-      providerInstanceId: `bybit_${bybitServer}_${keyInfo.userID ?? 'user'}_${Date.now()}`,
-      custody: 'custodial',
-      venueLabel: bybitServer === 'testnet' ? 'Bybit Testnet' : 'Bybit',
-      connectedAt: new Date().toISOString(),
-      bybitServer,
-      permissions,
-    };
+    const products: WalletProduct[] = [];
+    if (walletTypes.has('FUND')) products.push('FUND');
+    if (walletTypes.has('UNIFIED') || permissions.uta) products.push('UNIFIED');
+    if (permissions.canEarnRead) products.push('EARN');
 
-    this.sessions.set(account.id, {
-      account,
+    if (products.length === 0) {
+      throw new Error(
+        'This API key has no accessible Funding, UTA, or Earn wallets. Check key permissions.',
+      );
+    }
+
+    const connectionId = `bybit_${bybitServer}_${keyInfo.userID ?? 'user'}_${Date.now()}`;
+    const connection: Connection = {
+      id: connectionId,
       client,
       permissions,
       coinNames: new Map(),
-    });
+      bybitServer,
+      priceCache: new Map(),
+      priceCachedAt: 0,
+    };
+    this.connections.set(connectionId, connection);
 
-    return account;
+    const venueLabel = bybitServer === 'testnet' ? 'Bybit Testnet' : 'Bybit';
+    const connectedAt = new Date().toISOString();
+    const baseNickname = config.nickname.trim();
+    const accounts: WalletAccount[] = [];
+
+    for (const product of products) {
+      const account: WalletAccount = {
+        id: nextId('acct'),
+        nickname: `${baseNickname} · ${productLabel(product)}`,
+        providerType: 'bybit',
+        providerInstanceId: connectionId,
+        custody: 'custodial',
+        venueLabel,
+        connectedAt,
+        product,
+        bybitServer,
+        permissions,
+      };
+      this.sessions.set(account.id, {
+        account,
+        connectionId,
+        product,
+      });
+      accounts.push(account);
+    }
+
+    return accounts;
   }
 
   async disconnect(accountId: string): Promise<void> {
+    const session = this.sessions.get(accountId);
     this.sessions.delete(accountId);
     for (const [id, preview] of this.sendPreviews) {
       if (preview.request.accountId === accountId) this.sendPreviews.delete(id);
@@ -170,36 +213,43 @@ export class BybitCryptoProvider implements CryptoProvider {
     for (const [id, quote] of this.exchangeQuotes) {
       if (quote.request.accountId === accountId) this.exchangeQuotes.delete(id);
     }
+
+    if (!session) return;
+    const stillUsed = [...this.sessions.values()].some(
+      (s) => s.connectionId === session.connectionId,
+    );
+    if (!stillUsed) {
+      this.connections.delete(session.connectionId);
+    }
   }
 
   async listBalances(accountId: string): Promise<AssetBalance[]> {
-    const session = this.requireSession(accountId);
-    const out: AssetBalance[] = [];
+    const { session, connection } = this.requireSession(accountId);
 
-    const fund = await this.fetchFundBalances(session);
-    out.push(...fund);
-
-    if (session.permissions.uta) {
-      out.push(...(await this.fetchUtaBalances(session)));
+    let balances: AssetBalance[];
+    switch (session.product) {
+      case 'FUND':
+        balances = await this.fetchFundBalances(connection, accountId);
+        break;
+      case 'UNIFIED':
+        balances = await this.fetchUtaBalances(connection, accountId);
+        break;
+      case 'EARN':
+        balances = await this.fetchEarnBalances(connection, accountId);
+        break;
     }
 
-    if (session.permissions.canEarnRead) {
-      try {
-        out.push(...(await this.fetchEarnBalances(session)));
-      } catch (err) {
-        if (!(err instanceof BybitApiError)) throw err;
-      }
-    }
-
-    return out.filter((b) => b.quantity > 0 || b.fiatValueUsd > 0);
+    return this.withUsdValues(connection, balances).then((priced) =>
+      priced.filter((b) => b.quantity > 0 || b.fiatValueUsd > 0),
+    );
   }
 
   async listNetworks(
     accountId: string,
     assetSymbol: string,
   ): Promise<NetworkInfo[]> {
-    const session = this.requireSession(accountId);
-    const rows = await this.getCoinInfo(session, assetSymbol);
+    const { connection } = this.requireSession(accountId);
+    const rows = await this.getCoinInfo(connection, assetSymbol);
     const coin = rows.find((r) => r.coin === assetSymbol.toUpperCase());
     if (!coin) return [];
 
@@ -215,160 +265,184 @@ export class BybitCryptoProvider implements CryptoProvider {
   }
 
   async getTransactions(accountId: string): Promise<Transaction[]> {
-    const session = this.requireSession(accountId);
+    const { session, connection } = this.requireSession(accountId);
     const label = session.account.nickname;
     const txs: Transaction[] = [];
+    const product = session.product;
 
-    try {
-      const deposits = await session.client.get<{
-        rows?: Array<{
-          txID?: string;
-          coin?: string;
-          amount?: string;
-          chain?: string;
-          status?: number;
-          successAt?: string;
-          createTime?: string;
-        }>;
-      }>('/v5/asset/deposit/query-record', { limit: 50 });
+    if (product === 'FUND' || product === 'UNIFIED') {
+      try {
+        const deposits = await connection.client.get<{
+          rows?: Array<{
+            txID?: string;
+            coin?: string;
+            amount?: string;
+            chain?: string;
+            status?: number;
+            successAt?: string;
+            createTime?: string;
+          }>;
+        }>('/v5/asset/deposit/query-record', { limit: 50 });
 
-      for (const row of deposits.rows ?? []) {
-        const statusNum = row.status ?? 0;
-        txs.push({
-          id: row.txID || nextId('tx'),
-          accountId,
-          kind: 'deposit',
-          status: statusNum === 3 ? 'completed' : statusNum === 4 ? 'failed' : 'pending',
-          assetSymbol: (row.coin ?? '').toUpperCase(),
-          quantity: num(row.amount),
-          fiatValueUsd: 0,
-          networkName: row.chain,
-          createdAt: toIso(row.successAt || row.createTime),
-          providerLabel: label,
-          product: 'FUND',
-        });
+        if (product === 'FUND') {
+          for (const row of deposits.rows ?? []) {
+            const statusNum = row.status ?? 0;
+            txs.push({
+              id: row.txID || nextId('tx'),
+              accountId,
+              kind: 'deposit',
+              status:
+                statusNum === 3 ? 'completed' : statusNum === 4 ? 'failed' : 'pending',
+              assetSymbol: (row.coin ?? '').toUpperCase(),
+              quantity: num(row.amount),
+              fiatValueUsd: 0,
+              networkName: row.chain,
+              createdAt: toIso(row.successAt || row.createTime),
+              providerLabel: label,
+              product: 'FUND',
+            });
+          }
+        }
+      } catch {
+        /* optional */
       }
-    } catch {
-      /* deposit history may be unavailable without wallet scopes */
     }
 
-    try {
-      const withdraws = await session.client.get<{
-        rows?: Array<{
-          withdrawId?: string;
-          txID?: string;
-          coin?: string;
-          amount?: string;
-          chain?: string;
-          status?: string;
-          createTime?: string;
-          toAddress?: string;
-          rejectReason?: string;
-        }>;
-      }>('/v5/asset/withdraw/query-record', { limit: 50 });
+    if (product === 'FUND' || product === 'UNIFIED') {
+      try {
+        const withdraws = await connection.client.get<{
+          rows?: Array<{
+            withdrawId?: string;
+            txID?: string;
+            coin?: string;
+            amount?: string;
+            chain?: string;
+            status?: string;
+            createTime?: string;
+            toAddress?: string;
+            rejectReason?: string;
+          }>;
+        }>('/v5/asset/withdraw/query-record', { limit: 50 });
 
-      for (const row of withdraws.rows ?? []) {
-        const st = (row.status ?? '').toLowerCase();
-        let status: OperationStatus = 'pending';
-        if (st.includes('success') || st === '3' || st === '4') status = 'completed';
-        if (st.includes('fail') || st.includes('reject') || st === '2') status = 'failed';
-        txs.push({
-          id: row.withdrawId || row.txID || nextId('tx'),
-          accountId,
-          kind: 'withdrawal',
-          status,
-          assetSymbol: (row.coin ?? '').toUpperCase(),
-          quantity: num(row.amount),
-          fiatValueUsd: 0,
-          networkName: row.chain,
-          counterparty: row.toAddress,
-          failureReason: row.rejectReason || undefined,
-          createdAt: toIso(row.createTime),
-          providerLabel: label,
-          product: 'FUND',
-        });
+        if (product === 'FUND') {
+          for (const row of withdraws.rows ?? []) {
+            const st = (row.status ?? '').toLowerCase();
+            let status: OperationStatus = 'pending';
+            if (st.includes('success') || st === '3' || st === '4') status = 'completed';
+            if (st.includes('fail') || st.includes('reject') || st === '2') {
+              status = 'failed';
+            }
+            txs.push({
+              id: row.withdrawId || row.txID || nextId('tx'),
+              accountId,
+              kind: 'withdrawal',
+              status,
+              assetSymbol: (row.coin ?? '').toUpperCase(),
+              quantity: num(row.amount),
+              fiatValueUsd: 0,
+              networkName: row.chain,
+              counterparty: row.toAddress,
+              failureReason: row.rejectReason || undefined,
+              createdAt: toIso(row.createTime),
+              providerLabel: label,
+              product: 'FUND',
+            });
+          }
+        }
+      } catch {
+        /* optional */
       }
-    } catch {
-      /* optional */
-    }
 
-    try {
-      const transfers = await session.client.get<{
-        list?: Array<{
-          transferId?: string;
-          coin?: string;
-          amount?: string;
-          status?: string;
-          timestamp?: string;
-          fromAccountType?: string;
-          toAccountType?: string;
-        }>;
-      }>('/v5/asset/transfer/query-inter-transfer-list', { limit: 50 });
+      try {
+        const transfers = await connection.client.get<{
+          list?: Array<{
+            transferId?: string;
+            coin?: string;
+            amount?: string;
+            status?: string;
+            timestamp?: string;
+            fromAccountType?: string;
+            toAccountType?: string;
+          }>;
+        }>('/v5/asset/transfer/query-inter-transfer-list', { limit: 50 });
 
-      for (const row of transfers.list ?? []) {
-        const st = (row.status ?? '').toUpperCase();
-        txs.push({
-          id: row.transferId || nextId('tx'),
-          accountId,
-          kind: 'internal',
-          status:
-            st === 'SUCCESS' ? 'completed' : st === 'FAILED' ? 'failed' : 'pending',
-          assetSymbol: (row.coin ?? '').toUpperCase(),
-          quantity: num(row.amount),
-          fiatValueUsd: 0,
-          counterparty: `${row.fromAccountType ?? '?'} → ${row.toAccountType ?? '?'}`,
-          createdAt: toIso(row.timestamp),
-          providerLabel: label,
-        });
+        for (const row of transfers.list ?? []) {
+          const from = (row.fromAccountType ?? '').toUpperCase();
+          const to = (row.toAccountType ?? '').toUpperCase();
+          const involves =
+            from === product ||
+            to === product ||
+            (product === 'UNIFIED' && (from === 'UNIFIED' || to === 'UNIFIED')) ||
+            (product === 'FUND' && (from === 'FUND' || to === 'FUND'));
+          if (!involves) continue;
+
+          const st = (row.status ?? '').toUpperCase();
+          txs.push({
+            id: `${row.transferId || nextId('tx')}_${product}`,
+            accountId,
+            kind: 'internal',
+            status:
+              st === 'SUCCESS' ? 'completed' : st === 'FAILED' ? 'failed' : 'pending',
+            assetSymbol: (row.coin ?? '').toUpperCase(),
+            quantity: num(row.amount),
+            fiatValueUsd: 0,
+            counterparty: `${row.fromAccountType ?? '?'} → ${row.toAccountType ?? '?'}`,
+            createdAt: toIso(row.timestamp),
+            providerLabel: label,
+            product,
+          });
+        }
+      } catch {
+        /* optional */
       }
-    } catch {
-      /* optional */
-    }
 
-    try {
-      const converts = await session.client.get<{
-        list?: Array<{
-          exchangeTxId?: string;
-          fromCoin?: string;
-          toCoin?: string;
-          fromAmount?: string;
-          toAmount?: string;
-          exchangeStatus?: string;
-          createdAt?: string;
-        }>;
-      }>('/v5/asset/exchange/query-convert-history', { limit: 50 });
+      try {
+        const converts = await connection.client.get<{
+          list?: Array<{
+            exchangeTxId?: string;
+            fromCoin?: string;
+            toCoin?: string;
+            fromAmount?: string;
+            toAmount?: string;
+            exchangeStatus?: string;
+            createdAt?: string;
+            accountType?: string;
+          }>;
+        }>('/v5/asset/exchange/query-convert-history', { limit: 50 });
 
-      for (const row of converts.list ?? []) {
-        const st = (row.exchangeStatus ?? '').toLowerCase();
-        txs.push({
-          id: row.exchangeTxId || nextId('tx'),
-          accountId,
-          kind: 'exchange',
-          status:
-            st.includes('success') || st === 'init_ok'
-              ? 'completed'
-              : st.includes('fail')
-                ? 'failed'
-                : 'pending',
-          assetSymbol: (row.fromCoin ?? '').toUpperCase(),
-          quantity: num(row.fromAmount),
-          fiatValueUsd: 0,
-          counterAssetSymbol: (row.toCoin ?? '').toUpperCase(),
-          counterQuantity: num(row.toAmount),
-          createdAt: toIso(row.createdAt),
-          providerLabel: label,
-        });
+        for (const row of converts.list ?? []) {
+          const st = (row.exchangeStatus ?? '').toLowerCase();
+          txs.push({
+            id: `${row.exchangeTxId || nextId('tx')}_${product}`,
+            accountId,
+            kind: 'exchange',
+            status:
+              st.includes('success') || st === 'init_ok'
+                ? 'completed'
+                : st.includes('fail')
+                  ? 'failed'
+                  : 'pending',
+            assetSymbol: (row.fromCoin ?? '').toUpperCase(),
+            quantity: num(row.fromAmount),
+            fiatValueUsd: 0,
+            counterAssetSymbol: (row.toCoin ?? '').toUpperCase(),
+            counterQuantity: num(row.toAmount),
+            createdAt: toIso(row.createdAt),
+            providerLabel: label,
+            product,
+          });
+        }
+      } catch {
+        /* optional */
       }
-    } catch {
-      /* optional */
     }
 
     return txs.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }
 
   async prepareSend(request: SendRequest): Promise<SendPreview> {
-    const session = this.requireSession(request.accountId);
-    const fromProduct = request.fromProduct ?? 'FUND';
+    const { session, connection } = this.requireSession(request.accountId);
+    const fromProduct = session.product;
 
     if (fromProduct === 'EARN') {
       throw new Error(
@@ -377,7 +451,7 @@ export class BybitCryptoProvider implements CryptoProvider {
     }
 
     if (request.kind === 'withdrawal') {
-      assertCan(session.permissions, 'withdraw');
+      assertCan(connection.permissions, 'withdraw');
       const networks = await this.listNetworks(
         request.accountId,
         request.assetSymbol,
@@ -410,8 +484,10 @@ export class BybitCryptoProvider implements CryptoProvider {
     }
 
     if (request.kind === 'internal') {
-      assertCan(session.permissions, 'transfer');
-      const toProduct = request.toProduct;
+      assertCan(connection.permissions, 'transfer');
+      const toProduct =
+        request.toProduct ??
+        this.resolveSiblingProduct(session, request.destination);
       if (!toProduct || toProduct === fromProduct) {
         throw new Error('Choose a different destination wallet (Funding ↔ UTA).');
       }
@@ -441,8 +517,7 @@ export class BybitCryptoProvider implements CryptoProvider {
       return preview;
     }
 
-    // transfer → Bybit internal transfer (UID / email via forceChain=2)
-    assertCan(session.permissions, 'withdraw');
+    assertCan(connection.permissions, 'withdraw');
     const preview: SendPreviewState = {
       id: nextId('send'),
       request: { ...request, fromProduct },
@@ -452,7 +527,6 @@ export class BybitCryptoProvider implements CryptoProvider {
       youReceiveQuantity: request.quantity,
       estimatedArrival: 'Usually under a minute',
       irreversible: false,
-      chain: undefined,
     };
     this.sendPreviews.set(preview.id, preview);
     return preview;
@@ -468,20 +542,20 @@ export class BybitCryptoProvider implements CryptoProvider {
       };
     }
 
-    const session = this.requireSession(preview.request.accountId);
+    const { session, connection } = this.requireSession(preview.request.accountId);
     const { request } = preview;
 
     try {
       if (request.kind === 'internal') {
-        assertCan(session.permissions, 'transfer');
-        const result = await session.client.post<{
+        assertCan(connection.permissions, 'transfer');
+        const result = await connection.client.post<{
           transferId: string;
           status: string;
         }>('/v5/asset/transfer/inter-transfer', {
           transferId: crypto.randomUUID(),
           coin: request.assetSymbol.toUpperCase(),
           amount: String(request.quantity),
-          fromAccountType: request.fromProduct ?? 'FUND',
+          fromAccountType: session.product,
           toAccountType: request.toProduct ?? 'UNIFIED',
         });
 
@@ -503,7 +577,7 @@ export class BybitCryptoProvider implements CryptoProvider {
         };
       }
 
-      assertCan(session.permissions, 'withdraw');
+      assertCan(connection.permissions, 'withdraw');
       const forceChain = request.kind === 'transfer' ? 2 : 0;
       const body: Record<string, unknown> = {
         coin: request.assetSymbol.toUpperCase(),
@@ -511,13 +585,13 @@ export class BybitCryptoProvider implements CryptoProvider {
         amount: String(request.quantity),
         timestamp: Date.now(),
         forceChain,
-        accountType: request.fromProduct === 'UNIFIED' ? 'UTA' : 'FUND',
+        accountType: session.product === 'UNIFIED' ? 'UTA' : 'FUND',
       };
       if (forceChain !== 2 && preview.chain) {
         body.chain = preview.chain;
       }
 
-      const result = await session.client.post<{ id: string }>(
+      const result = await connection.client.post<{ id: string }>(
         '/v5/asset/withdraw/create',
         body,
       );
@@ -545,7 +619,18 @@ export class BybitCryptoProvider implements CryptoProvider {
     assetSymbol: string,
     networkId: string,
   ): Promise<ReceiveAddress> {
-    const session = this.requireSession(accountId);
+    const { session, connection } = this.requireSession(accountId);
+    if (session.product === 'EARN') {
+      throw new Error(
+        'Earn is read-only. Receive deposits into the Funding account instead.',
+      );
+    }
+    if (session.product !== 'FUND') {
+      throw new Error(
+        'On-chain deposits credit the Funding wallet. Switch to the Funding account to receive.',
+      );
+    }
+
     const networks = await this.listNetworks(accountId, assetSymbol);
     const network =
       networks.find((n) => n.id === networkId) ??
@@ -557,7 +642,7 @@ export class BybitCryptoProvider implements CryptoProvider {
       throw new Error(`${network.name} deposits are currently suspended.`);
     }
 
-    const result = await session.client.get<{
+    const result = await connection.client.get<{
       coin: string;
       chains: Array<{
         chainType: string;
@@ -589,12 +674,16 @@ export class BybitCryptoProvider implements CryptoProvider {
   }
 
   async prepareExchange(request: ExchangeRequest): Promise<ExchangeQuote> {
-    const session = this.requireSession(request.accountId);
-    assertCan(session.permissions, 'exchange');
+    const { session, connection } = this.requireSession(request.accountId);
+    assertCan(connection.permissions, 'exchange');
 
-    const product = request.product ?? 'FUND';
+    if (session.product === 'EARN') {
+      throw new Error('Earn products are read-only. Convert from Funding or UTA.');
+    }
+
+    const product = session.product as Exclude<WalletProduct, 'EARN'>;
     const accountType = convertAccountType(product);
-    const quote = await session.client.post<{
+    const quote = await connection.client.post<{
       quoteTxId: string;
       exchangeRate: string;
       fromCoin: string;
@@ -642,11 +731,11 @@ export class BybitCryptoProvider implements CryptoProvider {
       };
     }
 
-    const session = this.requireSession(quote.request.accountId);
-    assertCan(session.permissions, 'exchange');
+    const { connection } = this.requireSession(quote.request.accountId);
+    assertCan(connection.permissions, 'exchange');
 
     try {
-      const result = await session.client.post<{
+      const result = await connection.client.post<{
         exchangeStatus: string;
         quoteTxId: string;
       }>('/v5/asset/exchange/convert-execute', {
@@ -681,8 +770,15 @@ export class BybitCryptoProvider implements CryptoProvider {
   }
 
   async getCardCapability(accountId: string): Promise<CardCapability> {
-    const session = this.requireSession(accountId);
-    if (!session.permissions.canCard) {
+    const { session, connection } = this.requireSession(accountId);
+    if (session.product !== 'FUND') {
+      return {
+        supported: false,
+        unsupportedReason:
+          'Bybit Card spend is tied to the Funding wallet. Open the Funding account.',
+      };
+    }
+    if (!connection.permissions.canCard) {
       return {
         supported: false,
         unsupportedReason:
@@ -693,12 +789,13 @@ export class BybitCryptoProvider implements CryptoProvider {
   }
 
   async listCards(accountId: string): Promise<ProviderCard[]> {
-    const session = this.requireSession(accountId);
-    if (!session.permissions.canCard) return [];
+    const capability = await this.getCardCapability(accountId);
+    if (!capability.supported) return [];
 
+    const { session, connection } = this.requireSession(accountId);
     const funding = await this.listFundingBalances(accountId);
     const { balanceUsd, symbols } = sumEligibleFunding(funding);
-    const pans = await this.discoverCardPans(session);
+    const pans = await this.discoverCardPans(connection);
 
     if (pans.length === 0) {
       return [
@@ -710,7 +807,8 @@ export class BybitCryptoProvider implements CryptoProvider {
           lastFour: '····',
           network: 'visa',
           status: 'active',
-          holderName: session.account.nickname.replace(/\s+Bybit$/i, '') || 'Cardholder',
+          holderName:
+            session.account.nickname.replace(/\s+·\s+Funding$/i, '') || 'Cardholder',
           currency: 'USD',
           balanceUsd,
           balanceSource: 'calculated',
@@ -728,7 +826,8 @@ export class BybitCryptoProvider implements CryptoProvider {
       lastFour: pan4,
       network: 'visa' as const,
       status: 'active' as const,
-      holderName: session.account.nickname.replace(/\s+Bybit$/i, '') || 'Cardholder',
+      holderName:
+        session.account.nickname.replace(/\s+·\s+Funding$/i, '') || 'Cardholder',
       currency: 'USD',
       balanceUsd,
       balanceSource: 'calculated' as const,
@@ -741,15 +840,16 @@ export class BybitCryptoProvider implements CryptoProvider {
     accountId: string,
     cardId?: string,
   ): Promise<CardOperation[]> {
-    const session = this.requireSession(accountId);
-    if (!session.permissions.canCard) return [];
+    const capability = await this.getCardCapability(accountId);
+    if (!capability.supported) return [];
 
+    const { session, connection } = this.requireSession(accountId);
     const panFilter =
       cardId && cardId.includes('_card_') && !cardId.endsWith('_default')
         ? cardId.split('_card_').pop()
         : undefined;
 
-    const records = await this.fetchCardRecords(session, panFilter);
+    const records = await this.fetchCardRecords(connection, panFilter);
     return records
       .map((row) => {
         const pan4 = row.pan4 || '····';
@@ -773,9 +873,12 @@ export class BybitCryptoProvider implements CryptoProvider {
   }
 
   async listFundingBalances(accountId: string): Promise<FundingAssetBalance[]> {
-    const session = this.requireSession(accountId);
-    const fund = await this.fetchFundBalances(session);
-    return fund.map((b) => ({
+    const { session, connection } = this.requireSession(accountId);
+    if (session.product !== 'FUND') return [];
+
+    const fund = await this.fetchFundBalances(connection, accountId);
+    const priced = await this.withUsdValues(connection, fund);
+    return priced.map((b) => ({
       symbol: b.symbol,
       name: b.name,
       quantity: b.quantity,
@@ -784,34 +887,84 @@ export class BybitCryptoProvider implements CryptoProvider {
     }));
   }
 
-  private requireSession(accountId: string): Session {
+  private async resolveWalletTypes(
+    client: BybitRestClient,
+    permissions: ProviderPermissionSnapshot,
+  ): Promise<Set<string>> {
+    const types = new Set<string>();
+    try {
+      const result = await client.get<{
+        accounts?: Array<{ accountType?: string[] }>;
+      }>('/v5/user/get-member-type');
+      for (const account of result.accounts ?? []) {
+        for (const t of account.accountType ?? []) {
+          types.add(t.toUpperCase());
+        }
+      }
+    } catch {
+      types.add('FUND');
+      if (permissions.uta) types.add('UNIFIED');
+    }
+    if (types.size === 0) {
+      types.add('FUND');
+      if (permissions.uta) types.add('UNIFIED');
+    }
+    return types;
+  }
+
+  private requireSession(accountId: string): {
+    session: Session;
+    connection: Connection;
+  } {
     const session = this.sessions.get(accountId);
     if (!session) throw new Error('Bybit account is not connected.');
-    return session;
+    const connection = this.connections.get(session.connectionId);
+    if (!connection) throw new Error('Bybit connection credentials are gone. Reconnect.');
+    return { session, connection };
+  }
+
+  private resolveSiblingProduct(
+    session: Session,
+    destination: string,
+  ): WalletProduct | undefined {
+    if (destination === 'FUND' || destination === 'UNIFIED' || destination === 'EARN') {
+      return destination;
+    }
+    const sibling = [...this.sessions.values()].find(
+      (s) =>
+        s.connectionId === session.connectionId &&
+        (s.account.id === destination ||
+          s.account.nickname === destination ||
+          s.product === destination),
+    );
+    return sibling?.product;
   }
 
   private async getCoinInfo(
-    session: Session,
+    connection: Connection,
     coin?: string,
   ): Promise<CoinInfoRow[]> {
-    const cacheKey = `${session.account.bybitServer ?? 'mainnet'}:${coin ?? '*'}`;
+    const cacheKey = `${connection.bybitServer}:${coin ?? '*'}`;
     const cached = this.coinInfoCache.get(cacheKey);
     if (cached) return cached;
 
-    const result = await session.client.get<{ rows: CoinInfoRow[] }>(
+    const result = await connection.client.get<{ rows: CoinInfoRow[] }>(
       '/v5/asset/coin/query-info',
       coin ? { coin: coin.toUpperCase() } : {},
     );
     const rows = result.rows ?? [];
     this.coinInfoCache.set(cacheKey, rows);
     for (const row of rows) {
-      session.coinNames.set(row.coin, row.name || row.coin);
+      connection.coinNames.set(row.coin, row.name || row.coin);
     }
     return rows;
   }
 
-  private async fetchFundBalances(session: Session): Promise<AssetBalance[]> {
-    const result = await session.client.get<{
+  private async fetchFundBalances(
+    connection: Connection,
+    accountId: string,
+  ): Promise<AssetBalance[]> {
+    const result = await connection.client.get<{
       accountType: string;
       balance: WalletCoin[];
     }>('/v5/asset/transfer/query-account-coins-balance', {
@@ -819,29 +972,35 @@ export class BybitCryptoProvider implements CryptoProvider {
     });
 
     return (result.balance ?? [])
-      .map((c) => this.toBalance(session, c, 'FUND'))
+      .map((c) => this.toBalance(connection, accountId, c, 'FUND'))
       .filter((b) => b.quantity > 0);
   }
 
-  private async fetchUtaBalances(session: Session): Promise<AssetBalance[]> {
-    const result = await session.client.get<{
+  private async fetchUtaBalances(
+    connection: Connection,
+    accountId: string,
+  ): Promise<AssetBalance[]> {
+    const result = await connection.client.get<{
       list: Array<{ coin: WalletCoin[] }>;
     }>('/v5/account/wallet-balance', { accountType: 'UNIFIED' });
 
     const coins = result.list?.[0]?.coin ?? [];
     return coins
-      .map((c) => this.toBalance(session, c, 'UNIFIED'))
+      .map((c) => this.toBalance(connection, accountId, c, 'UNIFIED'))
       .filter((b) => b.quantity > 0 || b.fiatValueUsd > 0);
   }
 
-  private async fetchEarnBalances(session: Session): Promise<AssetBalance[]> {
-    assertCan(session.permissions, 'earnRead');
+  private async fetchEarnBalances(
+    connection: Connection,
+    accountId: string,
+  ): Promise<AssetBalance[]> {
+    assertCan(connection.permissions, 'earnRead');
     const categories = ['FlexibleSaving', 'OnChain'] as const;
     const merged = new Map<string, number>();
 
     for (const category of categories) {
       try {
-        const result = await session.client.get<{
+        const result = await connection.client.get<{
           list?: Array<{ coin?: string; amount?: string }>;
         }>('/v5/earn/position', { category });
         for (const row of result.list ?? []) {
@@ -849,8 +1008,10 @@ export class BybitCryptoProvider implements CryptoProvider {
           if (!coin) continue;
           merged.set(coin, (merged.get(coin) ?? 0) + num(row.amount));
         }
-      } catch {
-        /* category may be empty / unsupported for account */
+      } catch (err) {
+        if (err instanceof BybitApiError && err.retCode !== 0) {
+          /* category may be empty / unsupported */
+        }
       }
     }
 
@@ -859,17 +1020,18 @@ export class BybitCryptoProvider implements CryptoProvider {
       .map(([symbol, quantity]) => ({
         assetId: symbol.toLowerCase(),
         symbol,
-        name: session.coinNames.get(symbol) ?? symbol,
+        name: connection.coinNames.get(symbol) ?? symbol,
         quantity,
         fiatValueUsd: 0,
-        accountId: session.account.id,
+        accountId,
         product: 'EARN' as const,
         productLabel: productLabel('EARN'),
       }));
   }
 
   private toBalance(
-    session: Session,
+    connection: Connection,
+    accountId: string,
     coin: WalletCoin,
     product: WalletProduct,
   ): AssetBalance {
@@ -879,17 +1041,79 @@ export class BybitCryptoProvider implements CryptoProvider {
     return {
       assetId: symbol.toLowerCase(),
       symbol,
-      name: session.coinNames.get(symbol) ?? symbol,
+      name: connection.coinNames.get(symbol) ?? symbol,
       quantity,
       fiatValueUsd: fiatValueUsd || 0,
-      accountId: session.account.id,
+      accountId,
       product,
       productLabel: productLabel(product),
     };
   }
 
-  private async discoverCardPans(session: Session): Promise<string[]> {
-    const records = await this.fetchCardRecords(session);
+  private async withUsdValues(
+    connection: Connection,
+    balances: AssetBalance[],
+  ): Promise<AssetBalance[]> {
+    const needsPrice = balances.filter(
+      (b) => b.fiatValueUsd <= 0 && b.quantity > 0 && !STABLECOINS.has(b.symbol),
+    );
+    for (const b of balances) {
+      if (STABLECOINS.has(b.symbol) && b.fiatValueUsd <= 0) {
+        b.fiatValueUsd = b.quantity;
+      }
+    }
+    if (needsPrice.length === 0) return balances;
+
+    await this.refreshPrices(
+      connection,
+      needsPrice.map((b) => b.symbol),
+    );
+
+    return balances.map((b) => {
+      if (b.fiatValueUsd > 0) return b;
+      if (STABLECOINS.has(b.symbol)) {
+        return { ...b, fiatValueUsd: b.quantity };
+      }
+      const px = connection.priceCache.get(b.symbol) ?? 0;
+      return { ...b, fiatValueUsd: b.quantity * px };
+    });
+  }
+
+  private async refreshPrices(
+    connection: Connection,
+    symbols: string[],
+  ): Promise<void> {
+    const now = Date.now();
+    if (now - connection.priceCachedAt < 30_000 && connection.priceCache.size > 0) {
+      const missing = symbols.filter((s) => !connection.priceCache.has(s));
+      if (missing.length === 0) return;
+    }
+
+    try {
+      const result = await connection.client.get<{
+        list?: Array<{ symbol?: string; lastPrice?: string; usdIndexPrice?: string }>;
+      }>('/v5/market/tickers', { category: 'spot' });
+
+      for (const row of result.list ?? []) {
+        const pair = (row.symbol ?? '').toUpperCase();
+        const last = num(row.usdIndexPrice || row.lastPrice);
+        if (!pair || !(last > 0)) continue;
+        if (pair.endsWith('USDT')) {
+          const base = pair.slice(0, -4);
+          if (base) connection.priceCache.set(base, last);
+        } else if (pair.endsWith('USD')) {
+          const base = pair.slice(0, -3);
+          if (base) connection.priceCache.set(base, last);
+        }
+      }
+      connection.priceCachedAt = now;
+    } catch {
+      /* pricing is best-effort */
+    }
+  }
+
+  private async discoverCardPans(connection: Connection): Promise<string[]> {
+    const records = await this.fetchCardRecords(connection);
     const pans = new Set<string>();
     for (const row of records) {
       if (row.pan4 && /^\d{2,4}$/.test(row.pan4)) pans.add(row.pan4);
@@ -898,7 +1122,7 @@ export class BybitCryptoProvider implements CryptoProvider {
   }
 
   private async fetchCardRecords(
-    session: Session,
+    connection: Connection,
     pan4?: string,
   ): Promise<
     Array<{
@@ -924,7 +1148,7 @@ export class BybitCryptoProvider implements CryptoProvider {
 
     for (const type of types) {
       try {
-        const result = await session.client.post<{
+        const result = await connection.client.post<{
           data?: Array<Record<string, string | number | undefined>>;
         }>('/v5/card/transaction/query-asset-records', {
           type,

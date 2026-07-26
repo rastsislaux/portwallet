@@ -25,9 +25,15 @@ export function ReceiveScreen() {
 
   const accountOptions = useMemo(
     () =>
-      accounts.filter((a) =>
-        balances.some((b) => b.accountId === a.id && b.symbol === asset),
-      ),
+      accounts.filter((a) => {
+        if (a.providerType === 'bybit' && a.product && a.product !== 'FUND') {
+          return false;
+        }
+        return (
+          balances.some((b) => b.accountId === a.id && b.symbol === asset) ||
+          (a.providerType === 'bybit' && a.product === 'FUND')
+        );
+      }),
     [accounts, balances, asset],
   );
 
