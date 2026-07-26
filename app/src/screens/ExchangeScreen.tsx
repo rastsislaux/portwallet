@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
 import {
-  AssetIcon,
+  CryptoIcon,
   IconChevronDown,
   IconSwap,
   ProviderIcon,
@@ -230,7 +230,7 @@ export function ExchangeScreen() {
           <div className="conversion-leg__top">
             <span className="conversion-leg__hint">You pay</span>
             <label className="selector">
-              <AssetIcon symbol={fromSymbol} size={28} />
+              <CryptoIcon symbol={fromSymbol} size={28} decorative />
               <span className="selector__ticker">{fromSymbol}</span>
               <span className="selector__chevron">
                 <IconChevronDown size={14} />
@@ -275,7 +275,7 @@ export function ExchangeScreen() {
           <div className="conversion-leg__top">
             <span className="conversion-leg__hint">You receive</span>
             <label className="selector">
-              <AssetIcon symbol={toSymbol} size={28} />
+              <CryptoIcon symbol={toSymbol} size={28} decorative />
               <span className="selector__ticker">{toSymbol}</span>
               <span className="selector__chevron">
                 <IconChevronDown size={14} />

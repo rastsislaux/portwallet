@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
 import {
-  AssetIcon,
+  CryptoIcon,
   IconBack,
   IconExchange,
   IconReceive,
@@ -44,7 +44,7 @@ export function AssetDetailScreen() {
       </button>
       <header className="header-block">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <AssetIcon symbol={asset.symbol} size={44} />
+          <CryptoIcon symbol={asset.symbol} name={asset.name} size={44} decorative />
           <h1 className="screen-title">{asset.name}</h1>
         </div>
         <div className="portfolio-total">
@@ -120,6 +120,9 @@ export function AssetDetailScreen() {
           ) : (
             recent.map((tx) => (
               <div key={tx.id} className="tx-row">
+                <span className="tx-row__icon">
+                  <CryptoIcon symbol={tx.assetSymbol} size={32} decorative />
+                </span>
                 <span className="tx-row__title">
                   {tx.kind === 'exchange'
                     ? `Exchange ${tx.assetSymbol}→${tx.counterAssetSymbol}`
