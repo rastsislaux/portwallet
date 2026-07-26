@@ -13,22 +13,34 @@ export function ReceiveScreen() {
     [balances],
   );
 
-  const [asset, setAsset] = useState(params.get('asset') ?? assetSymbols[0] ?? 'BTC');
-  const [accountId, setAccountId] = useState(
-    () =>
-      balances.find((b) => b.symbol === (params.get('asset') ?? assetSymbols[0]))
-        ?.accountId ??
-      accounts[0]?.id ??
-      '',
-  );
+  const preferredAsset = params.get('asset') ?? assetSymbols[0] ?? 'BTC';
+  const [asset, setAsset] = useState(preferredAsset);
+  const [accountId, setAccountId] = useState('');
   const [networks, setNetworks] = useState<{ id: string; name: string }[]>([]);
   const [networkId, setNetworkId] = useState('');
   const [receive, setReceive] = useState<ReceiveAddress | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const accountOptions = accounts.filter((a) =>
-    balances.some((b) => b.accountId === a.id && b.symbol === asset),
+  const accountOptions = useMemo(
+    () =>
+      accounts.filter((a) =>
+        balances.some((b) => b.accountId === a.id && b.symbol === asset),
+      ),
+    [accounts, balances, asset],
   );
+
+  useEffect(() => {
+    if (!assetSymbols.includes(asset) && assetSymbols[0]) {
+      setAsset(assetSymbols[0]);
+    }
+  }, [asset, assetSymbols]);
+
+  useEffect(() => {
+    const stillValid = accountOptions.some((a) => a.id === accountId);
+    if (!stillValid) {
+      setAccountId(accountOptions[0]?.id ?? '');
+    }
+  }, [accountId, accountOptions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,8 +49,9 @@ export function ReceiveScreen() {
       const list = await listNetworks(accountId, asset);
       if (cancelled) return;
       setNetworks(list);
-      const nextNetwork = list[0]?.id ?? '';
-      setNetworkId(nextNetwork);
+      setNetworkId((current) =>
+        list.some((n) => n.id === current) ? current : (list[0]?.id ?? ''),
+      );
     })();
     return () => {
       cancelled = true;

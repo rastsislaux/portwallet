@@ -293,10 +293,10 @@ export class MockCryptoProvider implements CryptoProvider {
       throw new Error('Invalid network for asset');
     }
 
-    const suffix = accountId.slice(-4);
+    const suffix = accountId.replace(/\W/g, '').slice(-6).padStart(6, '0');
     const address =
       assetSymbol === 'BTC'
-        ? `bc1qportwallet${suffix}mockreceive9k2a`
+        ? `bc1qport${suffix}mockreceive9k2a`
         : assetSymbol === 'ETH'
           ? `0xPort${suffix}a1b2c3d4e5f60718293a`
           : `TPort${suffix}USDTReceiveMockAddr`;

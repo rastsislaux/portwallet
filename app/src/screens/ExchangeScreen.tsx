@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
 import type { ExchangeQuote, OperationResult } from '../domain/types';
@@ -21,19 +21,9 @@ export function ExchangeScreen() {
   );
 
   const [step, setStep] = useState<Step>('form');
-  const [fromSymbol, setFromSymbol] = useState(
-    params.get('from') ?? assetSymbols[0] ?? 'BTC',
-  );
-  const [toSymbol, setToSymbol] = useState(
-    assetSymbols.find((s) => s !== (params.get('from') ?? assetSymbols[0])) ?? 'USDT',
-  );
-  const [accountId, setAccountId] = useState(
-    () =>
-      balances.find((b) => b.symbol === (params.get('from') ?? assetSymbols[0]))
-        ?.accountId ??
-      accounts[0]?.id ??
-      '',
-  );
+  const [fromSymbol, setFromSymbol] = useState(params.get('from') ?? 'BTC');
+  const [toSymbol, setToSymbol] = useState('USDT');
+  const [accountId, setAccountId] = useState('');
   const [quantity, setQuantity] = useState('0.01');
   const [quote, setQuote] = useState<ExchangeQuote | null>(null);
   const [result, setResult] = useState<OperationResult | null>(null);
@@ -41,9 +31,31 @@ export function ExchangeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const accountOptions = accounts.filter((a) =>
-    balances.some((b) => b.accountId === a.id && b.symbol === fromSymbol),
+  const accountOptions = useMemo(
+    () =>
+      accounts.filter((a) =>
+        balances.some((b) => b.accountId === a.id && b.symbol === fromSymbol),
+      ),
+    [accounts, balances, fromSymbol],
   );
+
+  useEffect(() => {
+    if (!assetSymbols.includes(fromSymbol) && assetSymbols[0]) {
+      setFromSymbol(assetSymbols[0]);
+    }
+    if (!assetSymbols.includes(toSymbol)) {
+      const fallback =
+        assetSymbols.find((s) => s !== fromSymbol) ?? assetSymbols[0] ?? 'USDT';
+      setToSymbol(fallback);
+    }
+  }, [assetSymbols, fromSymbol, toSymbol]);
+
+  useEffect(() => {
+    const stillValid = accountOptions.some((a) => a.id === accountId);
+    if (!stillValid) {
+      setAccountId(accountOptions[0]?.id ?? '');
+    }
+  }, [accountId, accountOptions]);
 
   async function onQuote() {
     setError(null);

@@ -19,8 +19,16 @@ export function formatFiat(value: number): string {
   });
 }
 
-export function formatQty(value: number, max = 8): string {
+export function formatQty(value: number, max = 8, min = 0): string {
   return value.toLocaleString('en-US', {
+    minimumFractionDigits: min,
     maximumFractionDigits: max,
   });
+}
+
+export function formatAssetQty(symbol: string, value: number): string {
+  if (symbol === 'BTC') return formatQty(value, 8, 4);
+  if (symbol === 'ETH') return formatQty(value, 8, 4);
+  if (symbol === 'USDT' || symbol === 'USDC') return formatQty(value, 2, 2);
+  return formatQty(value);
 }

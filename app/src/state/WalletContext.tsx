@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -141,17 +142,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setTransactions(txs);
   }, [selectedAccounts]);
 
+  const didBootstrap = useRef(false);
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    if (didBootstrap.current) return;
+    didBootstrap.current = true;
+    void (async () => {
       const initial = await bootstrapAccounts();
-      if (cancelled) return;
       setAccounts(initial);
       setReady(true);
     })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {

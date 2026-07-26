@@ -64,5 +64,6 @@ Never “your keys” language for exchange accounts.
 3. Asset rows: symbol left, qty top-right, fiat bottom-right; no mini charts.
 4. Custody strip never collapses into an info icon.
 5. Slightly tighten balance → actions gap from 32 → 24 for daily-use density.
+6. Post-implementation polish: brand mark 17px (stronger first signal); solid nav surface (no translucent mix); asset quantities keep operational precision (BTC/ETH ≥4 dp, stables 2 dp).
 
 Overall direction unchanged: calm neutral wallet, multi-account honest custody, operational list.

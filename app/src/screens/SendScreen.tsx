@@ -26,15 +26,9 @@ export function SendScreen() {
     [balances],
   );
 
-  const initialAsset = params.get('asset') ?? assetSymbols[0] ?? 'BTC';
   const [step, setStep] = useState<Step>('form');
-  const [asset, setAsset] = useState(initialAsset);
-  const [accountId, setAccountId] = useState(
-    () =>
-      balances.find((b) => b.symbol === initialAsset)?.accountId ??
-      accounts[0]?.id ??
-      '',
-  );
+  const [asset, setAsset] = useState(params.get('asset') ?? 'BTC');
+  const [accountId, setAccountId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [destination, setDestination] = useState('');
   const [kind, setKind] = useState<
@@ -47,9 +41,26 @@ export function SendScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const accountOptions = accounts.filter((a) =>
-    balances.some((b) => b.accountId === a.id && b.symbol === asset),
+  const accountOptions = useMemo(
+    () =>
+      accounts.filter((a) =>
+        balances.some((b) => b.accountId === a.id && b.symbol === asset),
+      ),
+    [accounts, balances, asset],
   );
+
+  useEffect(() => {
+    if (!assetSymbols.includes(asset) && assetSymbols[0]) {
+      setAsset(assetSymbols[0]);
+    }
+  }, [asset, assetSymbols]);
+
+  useEffect(() => {
+    const stillValid = accountOptions.some((a) => a.id === accountId);
+    if (!stillValid) {
+      setAccountId(accountOptions[0]?.id ?? '');
+    }
+  }, [accountId, accountOptions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +69,9 @@ export function SendScreen() {
       const list = await listNetworks(accountId, asset);
       if (cancelled) return;
       setNetworks(list);
-      setNetworkId(list[0]?.id ?? '');
+      setNetworkId((current) =>
+        list.some((n) => n.id === current) ? current : (list[0]?.id ?? ''),
+      );
     })();
     return () => {
       cancelled = true;
@@ -67,9 +80,6 @@ export function SendScreen() {
 
   function onAssetChange(next: string) {
     setAsset(next);
-    const nextAccount =
-      balances.find((b) => b.symbol === next)?.accountId ?? accountId;
-    setAccountId(nextAccount);
   }
 
   async function onContinue() {

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
-import { formatFiat, formatQty } from '../components/Amount';
+import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
 import { useWallet } from '../state/WalletContext';
 
 export function HomeScreen() {
@@ -75,7 +75,7 @@ export function HomeScreen() {
                 >
                   <span className="asset-row__symbol">{asset.symbol}</span>
                   <span className="asset-row__qty tabular">
-                    {formatQty(asset.quantity)}
+                    {formatAssetQty(asset.symbol, asset.quantity)}
                   </span>
                   <span className="asset-row__name">{asset.name}</span>
                   <span className="asset-row__fiat tabular">
