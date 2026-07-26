@@ -44,26 +44,29 @@ export function HomeScreen() {
       ) : (
         <>
           <div className="portfolio-total">
-            <div className="portfolio-total__value tabular" aria-label={`${balance.integer}.${balance.decimal} USD`}>
+            <div
+              className="portfolio-total__value tabular"
+              aria-label={`${balance.integer}.${balance.decimal} USD`}
+            >
               <span className="portfolio-total__int">{balance.integer}</span>
               <span className="portfolio-total__dec">.{balance.decimal}</span>
             </div>
             <div className="portfolio-total__meta">
-              USD · ≈ {btcApprox} BTC
+              USD ≈ {btcApprox} BTC
             </div>
           </div>
 
           <div className="action-row">
             <Link className="btn btn--soft" to="/send">
-              <IconSend size={18} />
+              <IconSend size={16} strokeWidth={2.25} />
               Send
             </Link>
             <Link className="btn btn--soft" to="/receive">
-              <IconReceive size={18} />
+              <IconReceive size={16} strokeWidth={2.25} />
               Receive
             </Link>
             <Link className="btn btn--soft" to="/exchange">
-              <IconExchange size={18} />
+              <IconExchange size={16} strokeWidth={2.25} />
               Exchange
             </Link>
           </div>
@@ -78,7 +81,7 @@ export function HomeScreen() {
                   to={`/asset/${asset.assetId}`}
                 >
                   <span className="asset-row__icon">
-                    <AssetIcon symbol={asset.symbol} size={44} />
+                    <AssetIcon symbol={asset.symbol} size={40} />
                   </span>
                   <span className="asset-row__symbol">{asset.symbol}</span>
                   <span className="asset-row__qty tabular">

@@ -22,9 +22,6 @@ export function ActivityScreen() {
     <section className="screen">
       <header className="header-block">
         <h1 className="screen-title">Activity</h1>
-        <p className="custody-strip" style={{ marginTop: 0 }}>
-          Transfers, internal moves, withdrawals, and exchanges.
-        </p>
       </header>
 
       <div className="segmented" role="tablist" aria-label="Status filter">
@@ -55,14 +52,14 @@ export function ActivityScreen() {
         <>
           {pending.length > 0 && filter === 'all' ? (
             <div className="section-block">
-              <div className="section-label">Pending</div>
+              <div className="section-eyebrow">Pending</div>
               <TxList items={pending} />
             </div>
           ) : null}
 
           <div className="section-block">
             {filter === 'all' && pending.length > 0 ? (
-              <div className="section-label">Earlier</div>
+              <div className="section-eyebrow">Earlier</div>
             ) : null}
             <TxList items={filter === 'all' ? rest : filtered} />
           </div>

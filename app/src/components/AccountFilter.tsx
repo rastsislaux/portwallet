@@ -31,7 +31,7 @@ export function AccountFilter() {
         onClick={() => setOpen((v) => !v)}
       >
         {label}
-        <IconChevronDown size={14} />
+        <IconChevronDown size={14} strokeWidth={2} />
       </button>
       {open ? (
         <div className="filter-menu" role="listbox">
@@ -60,7 +60,6 @@ export function AccountFilter() {
                 <span>
                   {account.nickname}
                   <div style={{ fontSize: 12, color: 'var(--ink-tertiary)', fontWeight: 400 }}>
-                    {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
                     {account.venueLabel}
                   </div>
                 </span>

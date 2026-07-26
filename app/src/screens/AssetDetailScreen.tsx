@@ -21,7 +21,7 @@ export function AssetDetailScreen() {
     return (
       <section className="screen">
         <button type="button" className="back-link" onClick={() => navigate(-1)}>
-          <IconBack />
+          <IconBack size={20} />
           Back
         </button>
         <p>Asset not found in selected accounts.</p>
@@ -37,16 +37,16 @@ export function AssetDetailScreen() {
   return (
     <section className="screen">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
-        <IconBack />
+        <IconBack size={20} />
         Back
       </button>
       <header className="header-block">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <AssetIcon symbol={asset.symbol} size={40} />
+          <AssetIcon symbol={asset.symbol} size={44} />
           <h1 className="screen-title">{asset.name}</h1>
         </div>
         <div className="portfolio-total">
-          <div className="portfolio-total__value tabular" style={{ fontSize: 36 }}>
+          <div className="portfolio-total__value tabular" style={{ fontSize: 40 }}>
             {formatQty(asset.quantity)} {asset.symbol}
           </div>
           <div className="portfolio-total__meta">
@@ -57,37 +57,38 @@ export function AssetDetailScreen() {
 
       <div className="action-row">
         <Link className="btn btn--soft" to={`/send?asset=${asset.symbol}`}>
-          <IconSend size={16} />
+          <IconSend size={16} strokeWidth={2.25} />
           Send
         </Link>
         <Link className="btn btn--soft" to={`/receive?asset=${asset.symbol}`}>
-          <IconReceive size={16} />
+          <IconReceive size={16} strokeWidth={2.25} />
           Receive
         </Link>
         <Link className="btn btn--soft" to={`/exchange?from=${asset.symbol}`}>
-          <IconExchange size={16} />
+          <IconExchange size={16} strokeWidth={2.25} />
           Exchange
         </Link>
       </div>
 
       <div className="section-block">
         <div className="section-label">Held in</div>
-        <div className="account-list account-list--cards">
+        <div className="grouped-list">
           {holdings.map((h) => {
             const account = accounts.find((a) => a.id === h.accountId);
             return (
-              <div key={h.accountId} className="account-card">
-                <ProviderIcon type={account?.providerType ?? 'mock'} size={40} />
-                <div className="account-card__body">
-                  <div className="account-card__title">
+              <div key={h.accountId} className="grouped-row">
+                <ProviderIcon type={account?.providerType ?? 'mock'} size={36} />
+                <div className="grouped-row__body">
+                  <div className="grouped-row__title">
                     {account?.nickname ?? 'Account'}
                   </div>
-                  <div className="account-card__meta">
-                    {account?.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
+                  <div className="grouped-row__meta">
                     {account?.venueLabel}
+                    {' · '}
+                    {account?.custody === 'custodial' ? 'Custodial' : 'Non-custodial'}
                   </div>
                 </div>
-                <span className="tabular" style={{ fontWeight: 500 }}>
+                <span className="tabular" style={{ fontWeight: 510, fontSize: 15 }}>
                   {formatQty(h.quantity)}
                 </span>
               </div>
@@ -100,7 +101,7 @@ export function AssetDetailScreen() {
         <div className="section-label">Recent</div>
         <div className="tx-list">
           {recent.length === 0 ? (
-            <p className="muted">No recent activity.</p>
+            <p className="muted" style={{ padding: '16px' }}>No recent activity.</p>
           ) : (
             recent.map((tx) => (
               <div key={tx.id} className="tx-row">
