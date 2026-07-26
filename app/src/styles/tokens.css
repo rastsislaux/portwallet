@@ -1,21 +1,27 @@
 :root {
-  --bg: #f3f1ec;
-  --bg-elevated: #faf9f6;
-  --bg-muted: #eae7e0;
-  --ink: #161616;
-  --ink-secondary: #5c5a54;
-  --ink-tertiary: #8a877e;
-  --border: #d9d5cc;
-  --border-strong: #b8b3a8;
-  --accent: #2f5d4a;
-  --accent-contrast: #f7f5f0;
-  --accent-soft: #e4ede8;
-  --danger: #8b2e2e;
-  --danger-soft: #f3e4e4;
-  --warning: #8a5a18;
-  --warning-soft: #f5eddc;
-  --success: #2f5d4a;
-  --overlay: rgba(22, 22, 22, 0.36);
+  --bg: #f4f1ea;
+  --bg-elevated: #fbfaf7;
+  --bg-surface: #f7f4ed;
+  --bg-muted: #ebe6dc;
+  --bg-subtle: #efebe3;
+  --ink: #171614;
+  --ink-secondary: #6a675f;
+  --ink-tertiary: #9a968c;
+  --ink-quaternary: #b5b1a6;
+  --border: #e4dfd4;
+  --border-subtle: #ebe6dc;
+  --border-strong: #cfc8ba;
+  --accent: #184f3a;
+  --accent-hover: #143f2f;
+  --accent-contrast: #f7faf8;
+  --accent-soft: #e4efe8;
+  --danger: #8f4545;
+  --danger-soft: #f3ecea;
+  --warning: #8f6a2e;
+  --warning-soft: #f4efe4;
+  --success: #3d6b55;
+  --success-soft: #e8f0eb;
+  --overlay: rgba(23, 22, 20, 0.28);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -23,26 +29,42 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
-  --space-7: 48px;
+  --space-7: 40px;
+  --space-8: 48px;
+  --space-9: 64px;
 
-  --pad-screen: 20px;
-  --radius-control: 10px;
-  --radius-dialog: 16px;
+  --pad-screen: 24px;
+  --pad-screen-top: 40px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-control: 18px;
+  --radius-card: 20px;
+  --radius-sheet: 24px;
+
   --border-width: 1px;
+  --shadow-pass: 0 1px 2px rgba(23, 22, 20, 0.03);
 
   --font: 'IBM Plex Sans', 'Segoe UI', sans-serif;
-  --text-body: 15px;
-  --text-meta: 13px;
-  --text-title: 24px;
-  --text-balance: 38px;
+  --text-caption: 13px;
+  --text-meta: 15px;
+  --text-body: 16px;
+  --text-ticker: 20px;
+  --text-section: 22px;
+  --text-title: 34px;
+  --text-balance: 62px;
 
-  --nav-height: 64px;
+  --control-height: 56px;
+  --action-height: 42px;
+  --nav-height: 72px;
   --max-col: 480px;
-  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (min-width: 880px) {
   :root {
-    --pad-screen: 32px;
+    --pad-screen: 40px;
+    --pad-screen-top: 48px;
   }
 }

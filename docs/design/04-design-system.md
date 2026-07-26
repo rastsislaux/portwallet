@@ -2,103 +2,67 @@
 
 ## Principles
 
-Calm, trustworthy, compact, precise, operational. Whitespace and 1px separators over cards. One accent. Tabular numerals for money.
+Calm, trustworthy, precise, understated. Whitespace and typography over cards. One restrained accent. Tabular numerals for money. Craft over decoration.
 
 ## Typography
 
-- Family: **IBM Plex Sans** (single sans; excellent tabular figures via `font-variant-numeric: tabular-nums`)
-- Body: 15px / 22px
-- Metadata: 13px / 18px
-- Screen title: 24px / 30px, weight 560
-- Main balance: 38px / 44px, weight 500, tabular
-- Row primary: 15px medium
-- Row secondary: 13px regular, muted
+| Role | Size | Weight | Notes |
+|------|------|--------|-------|
+| Screen title / brand | 34px / 40px | Bold (700) | Tight tracking |
+| Section titles | 22px / 28px | Semibold (600) | Sentence case |
+| Balance | 62px | Medium (500) | Decimal lighter (400) |
+| Asset ticker | 20px / 26px | Semibold | |
+| Asset name / body | 16px / 22–24px | Regular | |
+| Metadata | 15px / 22px | Regular | |
+| Captions | 13px / 18px | Regular | Currency labels, custody |
 
-## Spacing (4px base)
+Family: **IBM Plex Sans** with `tabular-nums` for money.
 
-`4, 8, 12, 16, 24, 32, 48`
+## Spacing rhythm (8pt)
 
-- Screen padding: 20px mobile · 32px desktop (≥880px)
-- Section gap: 24px
-- List row padding: 12px 0
-- Control height: 44px (touch)
+| Scale | Use |
+|-------|-----|
+| 40–48px | Large section gaps (balance → actions, actions → assets) |
+| 24px | Medium gaps |
+| 12–16px | Small gaps (icon → text, card padding) |
+| 6–8px | Tiny gaps (title → subtitle, icon → label) |
 
-## Radii & borders
+Screen padding: 24px · top 40px (desktop 40/48).
 
-- Control radius: 10px
-- Dialog / sheet radius: 16px
-- Border: 1px solid `var(--border)`
-- No multi-layer shadows; optional 1px hairline elevation only on sheets
+## Radii scale
 
-## Color tokens
+`8 · 12 · 16 · 18 · 20 · 24`
 
-Restrained warm-neutral field with one ink-olive accent (not purple, not cyan neon).
+- Soft actions: 16px
+- Inputs / primary controls: **18px**
+- Account passes: 20px
+- Sheets: **24px**
 
-| Token | Value | Use |
-|-------|-------|-----|
-| `--bg` | `#F3F1EC` | App background |
-| `--bg-elevated` | `#FAF9F6` | Sheets, inputs |
-| `--bg-muted` | `#EAE7E0` | Pressed / segmented track |
-| `--ink` | `#161616` | Primary text |
-| `--ink-secondary` | `#5C5A54` | Secondary text |
-| `--ink-tertiary` | `#8A877E` | Meta, placeholders |
-| `--border` | `#D9D5CC` | Separators, input borders |
-| `--border-strong` | `#B8B3A8` | Focused controls |
-| `--accent` | `#2F5D4A` | Primary CTA, focus ring |
-| `--accent-contrast` | `#F7F5F0` | Text on accent |
-| `--accent-soft` | `#E4EDE8` | Selected segment |
-| `--danger` | `#8B2E2E` | Destructive / failed |
-| `--danger-soft` | `#F3E4E4` | Failed row tint |
-| `--warning` | `#8A5A18` | Pending / irreversible notice |
-| `--warning-soft` | `#F5EDDC` | Pending tint |
-| `--success` | `#2F5D4A` | Completed (shares accent family) |
-| `--overlay` | `rgba(22,22,22,0.36)` | Modal scrim |
+## Color
 
-Background atmosphere: soft vertical wash `#F7F5F0 → #EFEBE3` (no image collage, no glass).
+Warmer stone field. Darker muted green accent. Desaturated status colors. Nothing vibrant.
 
-## Components (reusable)
+| Token | Value |
+|-------|-------|
+| `--bg` | `#F4F1EA` |
+| `--bg-elevated` | `#FBFAF7` |
+| `--bg-surface` | `#F7F4ED` |
+| `--ink` | `#171614` |
+| `--ink-secondary` | `#6A675F` |
+| `--ink-tertiary` | `#9A968C` |
+| `--ink-quaternary` | `#B5B1A6` |
+| `--accent` | `#184F3A` |
+| `--success` | `#3D6B55` |
+| `--warning` | `#8F6A2E` |
+| `--danger` | `#8F4545` |
 
-| Component | Notes |
-|-----------|--------|
-| `AppShell` | Padding, max-width 480px centered on desktop, bottom nav |
-| `BrandHeader` | Wordmark + optional trailing control |
-| `CustodyStrip` | Always-on custody summary |
-| `PortfolioTotal` | Large balance + secondary approx |
-| `ActionRow` | 3 equal text buttons (Send / Receive / Exchange) |
-| `AssetRow` | Symbol, name, qty, fiat — separator below |
-| `AccountRow` | Nickname, custody badge, provider type, status |
-| `SegmentedControl` | Text segments, not pill clusters |
-| `Amount` | Tabular numeral primitive |
-| `Field` | Label + input / select, 10px radius |
-| `PrimaryButton` / `SecondaryButton` / `DangerButton` | 44px |
-| `Sheet` | 16px radius dialog/sheet |
-| `ReviewSummary` | Fee + you-receive block |
-| `StatusBadge` | pending / failed / completed — quiet text+tint |
-| `EmptyState` | One sentence + one CTA |
-| `TxRow` | Type, provider, network, amount, status |
+No gradients. No glass. Inputs: no shadows — focus is a single accent border.
 
-## Provider abstraction (UI layer)
+## Components
 
-```ts
-interface CryptoProvider {
-  readonly type: ProviderType;
-  readonly custody: CustodyKind; // 'custodial' | 'non-custodial'
-  connect(config): Promise<WalletAccount>;
-  listBalances(accountId): Promise<AssetBalance[]>;
-  getTransactions(accountId, filter): Promise<Transaction[]>;
-  prepareSend(request): Promise<SendPreview>; // includes fee + final
-  submitSend(previewId): Promise<OperationResult>;
-  getReceiveAddress(accountId, asset, network): Promise<ReceiveAddress>;
-  prepareExchange(request): Promise<ExchangeQuote>;
-  submitExchange(quoteId): Promise<OperationResult>;
-}
-```
-
-Registry holds many `WalletAccount`s; each points at a provider instance. UI never assumes a single provider.
-
-## Accessibility
-
-- Body contrast ≥ 4.5:1 on `--bg`
-- Focus visible: 2px `--accent` ring
-- Touch targets ≥ 44px
-- Status not by color alone (text label required)
+- **Primary actions (Home):** Apple Wallet–like soft controls, 42px, low contrast fill, larger icons as one optical unit with labels
+- **Asset rows:** on-page list (no cards), 44px icons at ~90% saturation, Contacts-like spacing
+- **Inputs:** 56px, 18px radius, custom chevron, generous padding
+- **Conversion hero:** large coin marks + tickers; vertical air; purpose of Exchange
+- **Account cards:** warm pass surfaces, tiny Connected badge, quiet Remove
+- **Bottom nav:** page-blended background; inactive nearly disappears; active ink-dark

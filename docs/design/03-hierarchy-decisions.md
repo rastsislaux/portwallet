@@ -25,8 +25,8 @@
 
 ## Density
 
-Moderately dense: 4px base scale, list rows ~56–64px, screen padding 20/32. Enough air to stay calm; not sparse “hero marketing” emptiness.
+Calm operational density: 4px base scale, list rows ~56–64px, screen padding 24/36, section gaps 32. Enough air to feel premium; not sparse marketing emptiness.
 
 ## Motion
 
-Only state transitions: tab change fade, sheet present, status badge settle, button press opacity. No ambient loops, no number slot-machine on load.
+Only state transitions: screen enter fade, sheet present, filter menu, staggered asset rows, button press. No ambient loops, no playful effects.

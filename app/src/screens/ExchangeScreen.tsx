@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
+import { AssetIcon, IconArrowDown, IconBack } from '../components/icons';
 import type { ExchangeQuote, OperationResult } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
@@ -137,23 +138,30 @@ export function ExchangeScreen() {
     return (
       <section className="screen">
         <button type="button" className="back-link" onClick={() => setStep('form')}>
-          ← Edit
+          <IconBack />
+          Edit
         </button>
         <h1 className="screen-title">Review exchange</h1>
 
-        <div className="review-block">
-          <div className="review-row">
-            <span>You send</span>
+        <div className="conversion-hero">
+          <div className="conversion-hero__asset">
+            <AssetIcon symbol={quote.request.fromSymbol} size={52} />
             <span className="tabular">
               {formatQty(quote.request.fromQuantity)} {quote.request.fromSymbol}
             </span>
           </div>
-          <div className="review-row review-row--emphasis">
-            <span>You receive</span>
+          <div className="conversion-hero__arrow">
+            <IconArrowDown size={18} />
+          </div>
+          <div className="conversion-hero__asset">
+            <AssetIcon symbol={quote.request.toSymbol} size={52} />
             <span className="tabular">
               {formatQty(quote.youReceiveQuantity)} {quote.request.toSymbol}
             </span>
           </div>
+        </div>
+
+        <div className="review-block">
           <div className="review-row">
             <span>Rate</span>
             <span>{quote.rateLabel}</span>
@@ -201,6 +209,20 @@ export function ExchangeScreen() {
         </p>
       </header>
 
+      <div className="conversion-hero">
+        <div className="conversion-hero__asset">
+          <AssetIcon symbol={fromSymbol} size={52} />
+          <span>{fromSymbol}</span>
+        </div>
+        <div className="conversion-hero__arrow">
+          <IconArrowDown size={18} />
+        </div>
+        <div className="conversion-hero__asset">
+          <AssetIcon symbol={toSymbol} size={52} />
+          <span>{toSymbol}</span>
+        </div>
+      </div>
+
       <div className="field">
         <label htmlFor="ex-account">Account</label>
         <select
@@ -218,7 +240,7 @@ export function ExchangeScreen() {
 
       <div className="field">
         <label htmlFor="ex-from">From</label>
-        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8 }}>
+        <div className="field-row">
           <select
             id="ex-from"
             value={fromSymbol}
@@ -287,7 +309,7 @@ export function ExchangeScreen() {
           </div>
         </div>
       ) : (
-        <button type="button" className="btn btn--block" onClick={() => void onQuote()} disabled={busy}>
+        <button type="button" className="btn btn--block btn--soft" onClick={() => void onQuote()} disabled={busy}>
           Get quote
         </button>
       )}

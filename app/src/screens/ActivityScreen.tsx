@@ -54,19 +54,15 @@ export function ActivityScreen() {
       ) : (
         <>
           {pending.length > 0 && filter === 'all' ? (
-            <div>
-              <div className="section-label" style={{ marginBottom: 4 }}>
-                Pending
-              </div>
+            <div className="section-block">
+              <div className="section-label">Pending</div>
               <TxList items={pending} />
             </div>
           ) : null}
 
-          <div>
+          <div className="section-block">
             {filter === 'all' && pending.length > 0 ? (
-              <div className="section-label" style={{ marginBottom: 4 }}>
-                Earlier
-              </div>
+              <div className="section-label">Earlier</div>
             ) : null}
             <TxList items={filter === 'all' ? rest : filtered} />
           </div>
@@ -96,7 +92,9 @@ function TxList({ items }: { items: ReturnType<typeof useWallet>['transactions']
               {tx.networkName ? ` · ${tx.networkName}` : ''}
               {tx.failureReason ? ` · ${tx.failureReason}` : ''}
             </span>
-            <StatusBadge status={tx.status} />
+            <span className="tx-row__status">
+              <StatusBadge status={tx.status} />
+            </span>
           </div>
         );
       })}

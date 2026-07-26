@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ProviderIcon } from '../components/icons';
 import type { ProviderType } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
@@ -48,33 +49,39 @@ export function AccountsScreen() {
         </p>
       </header>
 
-      <div className="account-list">
+      <div className="account-list account-list--cards">
         {accounts.map((account) => (
-          <div key={account.id} className="account-row">
-            <span className="account-row__title">{account.nickname}</span>
-            <button
-              type="button"
-              className="filter-button"
-              onClick={() => setConfirmRemoveId(account.id)}
-            >
-              Remove
-            </button>
-            <span className="account-row__meta">
-              {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
-              {account.venueLabel} · Connected
-            </span>
+          <div key={account.id} className="account-card">
+            <ProviderIcon type={account.providerType} size={44} />
+            <div className="account-card__body">
+              <div className="account-card__title">{account.nickname}</div>
+              <div className="account-card__meta">
+                {account.custody === 'custodial' ? 'Custodial' : 'Non-custodial'} ·{' '}
+                {account.venueLabel}
+              </div>
+            </div>
+            <div className="account-card__aside">
+              <span className="account-card__state">Connected</span>
+              <button
+                type="button"
+                className="filter-button filter-button--quiet"
+                onClick={() => setConfirmRemoveId(account.id)}
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
-      <button type="button" className="btn btn--block" onClick={() => setAdding(true)}>
+      <button type="button" className="btn btn--block btn--soft" onClick={() => setAdding(true)}>
         + Add account
       </button>
 
       {adding ? (
         <div className="sheet-backdrop" role="dialog" aria-modal="true">
           <div className="sheet">
-            <h2 className="screen-title" style={{ fontSize: 20 }}>
+            <h2 className="screen-title" style={{ fontSize: 22 }}>
               Add account
             </h2>
             <div className="field">
@@ -91,9 +98,12 @@ export function AccountsScreen() {
                 ))}
               </select>
             </div>
-            <div className="notice notice--warning">
-              {selectedType?.custodyLabel}. Assets stay with this provider — Portwallet
-              does not take custody.
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <ProviderIcon type={type} size={40} />
+              <div className="notice notice--warning" style={{ flex: 1, margin: 0 }}>
+                {selectedType?.custodyLabel}. Assets stay with this provider — Portwallet
+                does not take custody.
+              </div>
             </div>
             <div className="field">
               <label htmlFor="nickname">Nickname</label>
@@ -135,7 +145,7 @@ export function AccountsScreen() {
       {confirmRemoveId ? (
         <div className="sheet-backdrop" role="dialog" aria-modal="true">
           <div className="sheet">
-            <h2 className="screen-title" style={{ fontSize: 20 }}>
+            <h2 className="screen-title" style={{ fontSize: 22 }}>
               Remove account?
             </h2>
             <p style={{ margin: 0, color: 'var(--ink-secondary)' }}>

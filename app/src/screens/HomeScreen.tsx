@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
-import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
+import { formatAssetQty, formatFiat, formatFiatParts, formatQty } from '../components/Amount';
+import { AssetIcon, IconExchange, IconReceive, IconSend } from '../components/icons';
 import { useWallet } from '../state/WalletContext';
 
 export function HomeScreen() {
@@ -10,20 +11,21 @@ export function HomeScreen() {
   const btcApprox = btc
     ? formatQty(totalFiatUsd / (btc.fiatValueUsd / btc.quantity || 68420), 4)
     : formatQty(totalFiatUsd / 68420, 4);
+  const balance = formatFiatParts(totalFiatUsd);
 
   if (!ready) {
     return (
-      <section className="screen">
+      <section className="screen screen--home">
         <div className="brand-header">
           <div className="brand-mark">Portwallet</div>
         </div>
-        <p style={{ color: 'var(--ink-secondary)' }}>Loading accounts…</p>
+        <p className="loading-line">Loading accounts…</p>
       </section>
     );
   }
 
   return (
-    <section className="screen">
+    <section className="screen screen--home">
       <header className="header-block">
         <div className="brand-header">
           <div className="brand-mark">Portwallet</div>
@@ -42,8 +44,9 @@ export function HomeScreen() {
       ) : (
         <>
           <div className="portfolio-total">
-            <div className="portfolio-total__value tabular">
-              {formatFiat(totalFiatUsd)}
+            <div className="portfolio-total__value tabular" aria-label={`${balance.integer}.${balance.decimal} USD`}>
+              <span className="portfolio-total__int">{balance.integer}</span>
+              <span className="portfolio-total__dec">.{balance.decimal}</span>
             </div>
             <div className="portfolio-total__meta">
               USD · ≈ {btcApprox} BTC
@@ -51,21 +54,22 @@ export function HomeScreen() {
           </div>
 
           <div className="action-row">
-            <Link className="btn" to="/send">
+            <Link className="btn btn--soft" to="/send">
+              <IconSend size={18} />
               Send
             </Link>
-            <Link className="btn" to="/receive">
+            <Link className="btn btn--soft" to="/receive">
+              <IconReceive size={18} />
               Receive
             </Link>
-            <Link className="btn" to="/exchange">
+            <Link className="btn btn--soft" to="/exchange">
+              <IconExchange size={18} />
               Exchange
             </Link>
           </div>
 
-          <div>
-            <div className="section-label" style={{ marginBottom: 4 }}>
-              Assets
-            </div>
+          <div className="section-block">
+            <div className="section-label">Assets</div>
             <div className="asset-list">
               {assets.map((asset) => (
                 <Link
@@ -73,6 +77,9 @@ export function HomeScreen() {
                   className="asset-row"
                   to={`/asset/${asset.assetId}`}
                 >
+                  <span className="asset-row__icon">
+                    <AssetIcon symbol={asset.symbol} size={44} />
+                  </span>
                   <span className="asset-row__symbol">{asset.symbol}</span>
                   <span className="asset-row__qty tabular">
                     {formatAssetQty(asset.symbol, asset.quantity)}
