@@ -540,17 +540,48 @@ img {
   font-weight: 400;
 }
 
-.asset-icon {
+.asset-icon,
+.crypto-icon {
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
   background: var(--bg-fill);
 }
 
-.asset-icon img {
+.asset-icon img,
+.crypto-icon img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+}
+
+.crypto-icon__skeleton {
+  animation: crypto-icon-pulse 1.1s var(--ease) infinite;
+}
+
+@keyframes crypto-icon-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.crypto-icon-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 12px;
+}
+
+.crypto-icon-gallery__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-caption);
+  color: var(--ink-secondary);
 }
 
 .provider-icon {
@@ -688,6 +719,10 @@ img {
   position: relative;
 }
 
+.tx-row:has(.tx-row__icon) {
+  grid-template-columns: auto 1fr auto;
+}
+
 .tx-row + .tx-row::before {
   content: '';
   position: absolute;
@@ -698,12 +733,21 @@ img {
   background: var(--separator);
 }
 
+.tx-row__icon {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
 .tx-row__title,
 .account-row__title {
   font-weight: 510;
   font-size: var(--text-body);
   letter-spacing: -0.015em;
   line-height: 21px;
+}
+
+.tx-row:has(.tx-row__icon) .tx-row__title {
+  grid-column: 2;
 }
 
 .tx-row__meta,
@@ -714,15 +758,39 @@ img {
   line-height: 17px;
 }
 
+.tx-row:has(.tx-row__icon) .tx-row__meta {
+  grid-column: 2;
+}
+
 .tx-row__amount {
+  grid-column: 2;
+  grid-row: 1;
   text-align: right;
   font-weight: 510;
   letter-spacing: -0.02em;
   font-size: var(--text-body);
 }
 
+.tx-row:has(.tx-row__icon) .tx-row__amount {
+  grid-column: 3;
+}
+
 .tx-row__status {
+  grid-column: 2;
+  grid-row: 2;
   justify-self: end;
+}
+
+.tx-row:has(.tx-row__icon) .tx-row__status {
+  grid-column: 3;
+}
+
+.funding-breakdown__asset {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 510;
 }
 
 .account-row {
@@ -1714,10 +1782,6 @@ img {
   background: var(--separator);
 }
 
-.funding-breakdown__row span:first-child {
-  color: var(--ink);
-  font-weight: 510;
-}
 
 .empty--compact {
   padding: 20px 8px;

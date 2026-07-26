@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
 import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
-import { AssetIcon, IconExchange, IconReceive, IconSend, IconSettings } from '../components/icons';
+import { CryptoIcon, IconExchange, IconReceive, IconSend, IconSettings } from '../components/icons';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -108,7 +108,7 @@ export function HomeScreen() {
                   to={`/asset/${asset.assetId}`}
                 >
                   <span className="asset-row__icon">
-                    <AssetIcon symbol={asset.symbol} size={40} />
+                    <CryptoIcon symbol={asset.symbol} name={asset.name} size={40} decorative />
                   </span>
                   <span className="asset-row__symbol">{asset.symbol}</span>
                   <span className="asset-row__qty tabular">

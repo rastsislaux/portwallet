@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
-import { AssetIcon, IconBack, IconChevronDown } from '../components/icons';
+import { CryptoIcon, IconBack, IconChevronDown } from '../components/icons';
 import type {
   OperationResult,
   SendPreview,
@@ -218,7 +218,7 @@ export function SendScreen() {
         <div className="section-block">
           <div className="section-label">You send</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <AssetIcon symbol={preview.request.assetSymbol} size={40} />
+            <CryptoIcon symbol={preview.request.assetSymbol} size={40} decorative />
             <div className="review-amount tabular">
               {formatQty(preview.request.quantity)} {preview.request.assetSymbol}
             </div>
@@ -302,7 +302,7 @@ export function SendScreen() {
       <div className="field">
         <label htmlFor="send-asset">Asset</label>
         <div className="asset-select">
-          <AssetIcon symbol={asset} size={28} />
+          <CryptoIcon symbol={asset} size={28} decorative />
           <span className="asset-select__label">{asset}</span>
           <span className="asset-select__chevron">
             <IconChevronDown size={16} />

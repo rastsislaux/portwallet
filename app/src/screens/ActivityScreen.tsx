@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { formatQty } from '../components/Amount';
+import { CryptoIcon } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
 import type { OperationStatus } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
@@ -82,6 +83,9 @@ function TxList({ items }: { items: ReturnType<typeof useWallet>['transactions']
 
         return (
           <div key={tx.id} className="tx-row">
+            <span className="tx-row__icon">
+              <CryptoIcon symbol={tx.assetSymbol} size={32} decorative />
+            </span>
             <span className="tx-row__title">{title}</span>
             <span className="tx-row__amount tabular">{signed}</span>
             <span className="tx-row__meta">
