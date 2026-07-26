@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { formatQty } from '../components/Amount';
+import { formatAssetQty, formatQty } from '../components/Amount';
 import {
   CryptoIcon,
   IconChevronDown,
   IconSwap,
   ProviderIcon,
 } from '../components/icons';
+import { balanceQuantity, isInsufficientBalance } from '../domain/balances';
 import type { ExchangeQuote, OperationResult } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
@@ -55,6 +56,19 @@ export function ExchangeScreen() {
       ? !selectedAccount.permissions.canExchange || selectedAccount.product === 'EARN'
       : false;
 
+  const fromAvailable = useMemo(
+    () => (accountId ? balanceQuantity(balances, accountId, fromSymbol) : 0),
+    [balances, accountId, fromSymbol],
+  );
+
+  const toAvailable = useMemo(
+    () => (accountId ? balanceQuantity(balances, accountId, toSymbol) : 0),
+    [balances, accountId, toSymbol],
+  );
+
+  const qty = Number(quantity);
+  const insufficientBalance = isInsufficientBalance(qty, fromAvailable);
+
   useEffect(() => {
     if (!assetSymbols.includes(fromSymbol) && assetSymbols[0]) {
       setFromSymbol(assetSymbols[0]);
@@ -74,8 +88,8 @@ export function ExchangeScreen() {
   }, [accountId, accountOptions]);
 
   useEffect(() => {
-    const qty = Number(quantity);
-    if (!accountId || !(qty > 0) || fromSymbol === toSymbol) {
+    const amount = Number(quantity);
+    if (!accountId || !(amount > 0) || fromSymbol === toSymbol) {
       setQuote(null);
       setError(
         fromSymbol === toSymbol ? 'Choose different assets.' : null,
@@ -93,6 +107,15 @@ export function ExchangeScreen() {
       return;
     }
 
+    if (isInsufficientBalance(amount, fromAvailable)) {
+      setQuote(null);
+      setError(
+        `Insufficient balance. Available ${formatAssetQty(fromSymbol, fromAvailable)} ${fromSymbol}.`,
+      );
+      setQuoting(false);
+      return;
+    }
+
     let cancelled = false;
     setQuoting(true);
     setError(null);
@@ -104,7 +127,7 @@ export function ExchangeScreen() {
             accountId,
             fromSymbol,
             toSymbol,
-            fromQuantity: qty,
+            fromQuantity: amount,
             product:
               isBybit &&
               (selectedAccount?.product === 'FUND' ||
@@ -140,6 +163,7 @@ export function ExchangeScreen() {
     isBybit,
     selectedAccount?.product,
     exchangeBlocked,
+    fromAvailable,
   ]);
 
   function swapAssets() {
@@ -151,7 +175,7 @@ export function ExchangeScreen() {
   }
 
   async function onConfirm() {
-    if (!quote) return;
+    if (!quote || insufficientBalance) return;
     setBusy(true);
     try {
       const r = await submitExchange(quote.request.accountId, quote.id);
@@ -218,7 +242,9 @@ export function ExchangeScreen() {
           >
             {accountOptions.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.nickname}
+                {a.nickname} ·{' '}
+                {formatAssetQty(fromSymbol, balanceQuantity(balances, a.id, fromSymbol))}{' '}
+                {fromSymbol}
               </option>
             ))}
           </select>
@@ -256,6 +282,21 @@ export function ExchangeScreen() {
             placeholder="0"
             aria-label="Amount to exchange"
           />
+          {accountId ? (
+            <div className="conversion-leg__balance">
+              <span className="tabular">
+                Available {formatAssetQty(fromSymbol, fromAvailable)} {fromSymbol}
+              </span>
+              <button
+                type="button"
+                className="conversion-leg__balance-max"
+                disabled={fromAvailable <= 0}
+                onClick={() => setQuantity(String(fromAvailable))}
+              >
+                Max
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="conversion-swap">
@@ -299,6 +340,13 @@ export function ExchangeScreen() {
           >
             {receiveLabel}
           </div>
+          {accountId ? (
+            <div className="conversion-leg__balance">
+              <span className="tabular">
+                Balance {formatAssetQty(toSymbol, toAvailable)} {toSymbol}
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -343,12 +391,23 @@ export function ExchangeScreen() {
           </>
         ) : (
           <div className="quote-status">
-            {quoting ? 'Updating quote…' : error ?? 'Enter an amount to see your quote'}
+            {quoting
+              ? 'Updating quote…'
+              : insufficientBalance
+                ? 'Amount exceeds available balance'
+                : error ?? 'Enter an amount to see your quote'}
           </div>
         )}
       </div>
 
-      {error && quote === null && !quoting ? (
+      {insufficientBalance ? (
+        <div className="notice notice--danger">
+          Insufficient balance. Available {formatAssetQty(fromSymbol, fromAvailable)}{' '}
+          {fromSymbol}.
+        </div>
+      ) : null}
+
+      {error && quote === null && !quoting && !insufficientBalance ? (
         <div className="notice notice--danger">{error}</div>
       ) : null}
 
@@ -356,7 +415,9 @@ export function ExchangeScreen() {
         type="button"
         className="btn btn--primary btn--block exchange-confirm"
         onClick={() => void onConfirm()}
-        disabled={busy || !quote || quoting || exchangeBlocked}
+        disabled={
+          busy || !quote || quoting || exchangeBlocked || insufficientBalance
+        }
       >
         Confirm exchange
       </button>
