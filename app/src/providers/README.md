@@ -25,3 +25,7 @@ Optional payment-card surface per account:
 - `getCardCapability` — venue may not support cards (e.g. non-custodial)
 - `listCards` / `getCardOperations` — issued cards and spend history
 - `listFundingBalances` — funding-account coins used when balance is calculated (Bybit sums eligible assets instead of exposing a card balance)
+
+### Bybit card transaction query quirk
+
+`POST /v5/card/transaction/query-asset-records` only accepts `type: "SIDE_QUERY_AUTH"`. Values such as `SIDE_QUERY_FINANCIAL` and `SIDE_QUERY_REFUND` are rejected as invalid parameters (despite appearing in older samples). Portwallet therefore queries only `SIDE_QUERY_AUTH`.

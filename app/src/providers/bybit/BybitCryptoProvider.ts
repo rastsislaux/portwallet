@@ -1224,43 +1224,42 @@ export class BybitCryptoProvider implements CryptoProvider {
       declinedReason?: string;
     }>
   > {
-    const types = ['SIDE_QUERY_FINANCIAL', 'SIDE_QUERY_AUTH', 'SIDE_QUERY_REFUND'];
-    const all: Array<Record<string, string | number | undefined>> = [];
+    // Bybit `/v5/card/transaction/query-asset-records` only accepts
+    // `SIDE_QUERY_AUTH` for `type` in practice. `SIDE_QUERY_FINANCIAL` and
+    // `SIDE_QUERY_REFUND` are rejected as invalid parameters despite appearing
+    // in older docs / client samples — do not request them.
     const client = this.cardApiClient(connection);
 
-    for (const type of types) {
-      try {
-        const result = await client.post<{
-          data?: Array<Record<string, string | number | undefined>>;
-        }>('/v5/card/transaction/query-asset-records', {
-          type,
-          limit: 100,
-          page: 1,
-          ...(pan4 && pan4 !== '····' ? { pan4 } : {}),
-        });
-        all.push(...(result.data ?? []));
-      } catch {
-        /* BitCard endpoints may 403 without card */
-      }
+    try {
+      const result = await client.post<{
+        data?: Array<Record<string, string | number | undefined>>;
+      }>('/v5/card/transaction/query-asset-records', {
+        type: 'SIDE_QUERY_AUTH',
+        limit: 100,
+        page: 1,
+        ...(pan4 && pan4 !== '····' ? { pan4 } : {}),
+      });
+      return (result.data ?? []) as Array<{
+        pan4?: string;
+        side?: string;
+        status?: string;
+        tradeStatus?: string;
+        basicAmount?: string;
+        billAmount?: string;
+        paidAmount?: string;
+        basicCurrency?: string;
+        paidCurrency?: string;
+        transactionCurrencyAmount?: string;
+        merchName?: string;
+        txnId?: string;
+        orderNo?: string;
+        txnCreate?: number | string;
+        declinedReason?: string;
+      }>;
+    } catch {
+      /* BitCard endpoints may 403 without card */
+      return [];
     }
-
-    return all as Array<{
-      pan4?: string;
-      side?: string;
-      status?: string;
-      tradeStatus?: string;
-      basicAmount?: string;
-      billAmount?: string;
-      paidAmount?: string;
-      basicCurrency?: string;
-      paidCurrency?: string;
-      transactionCurrencyAmount?: string;
-      merchName?: string;
-      txnId?: string;
-      orderNo?: string;
-      txnCreate?: number | string;
-      declinedReason?: string;
-    }>;
   }
 }
 
