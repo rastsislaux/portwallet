@@ -242,9 +242,13 @@ export function HomeScreen() {
                   Number.isFinite(pnlUsd) &&
                   Number.isFinite(pnlPct);
                 const tone = assetSecondaryTone(pnlUsd);
+                const distinctName =
+                  asset.name.trim().toUpperCase() !== asset.symbol.toUpperCase();
                 const secondary = hasPnl
                   ? formatPurchasePnl(pnlPct, pnlUsd, formatFromUsd)
-                  : asset.name;
+                  : distinctName
+                    ? asset.name
+                    : null;
 
                 return (
                   <Link
@@ -264,11 +268,12 @@ export function HomeScreen() {
                         'asset-row__name',
                         'tabular',
                         tone ? `asset-row__name--${tone}` : '',
+                        !secondary ? 'asset-row__name--empty' : '',
                       ]
                         .filter(Boolean)
                         .join(' ')}
                     >
-                      {secondary}
+                      {secondary ?? '\u00a0'}
                     </span>
                     <span className="asset-row__fiat tabular">
                       {formatFromUsd(asset.fiatValueUsd)}

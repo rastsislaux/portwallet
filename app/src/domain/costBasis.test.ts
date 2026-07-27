@@ -10,7 +10,7 @@ import type { AggregatedAsset, Transaction } from './types';
 
 function tx(partial: Partial<Transaction> & Pick<Transaction, 'kind' | 'assetSymbol' | 'quantity'>): Transaction {
   return {
-    id: partial.id ?? 'tx',
+    id: partial.id ?? `tx_${Math.random().toString(36).slice(2, 10)}`,
     accountId: partial.accountId ?? 'acc',
     kind: partial.kind,
     status: partial.status ?? 'completed',
@@ -98,6 +98,24 @@ describe('averagePurchasePrice', () => {
       'ETH',
     );
     expect(purchase).toBeNull();
+  });
+
+  it('dedupes acquisitions that share the same transaction id', () => {
+    const buy = tx({
+      id: 'exec_1',
+      kind: 'exchange',
+      assetSymbol: 'USDT',
+      quantity: 100,
+      fiatValueUsd: 100,
+      counterAssetSymbol: 'ETH',
+      counterQuantity: 0.05,
+    });
+    const purchase = averagePurchasePrice([buy, { ...buy }], 'ETH');
+    expect(purchase).toEqual({
+      averagePriceUsd: 2000,
+      totalCostUsd: 100,
+      acquiredQuantity: 0.05,
+    });
   });
 
   it('estimates cost from stablecoin from-amount when fiat is missing', () => {
