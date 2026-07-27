@@ -32,12 +32,32 @@ export function CardCarousel({
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const ignoreScrollSelect = useRef(false);
   const ignoreTimer = useRef<number | null>(null);
+  const settleTimer = useRef<number | null>(null);
 
   const cardIdsKey = useMemo(() => cards.map((c) => c.id).join('|'), [cards]);
   const selectedIndex = Math.max(
     0,
     cards.findIndex((c) => c.id === selectedCardId),
   );
+
+  const nearestIndex = useCallback(() => {
+    const rail = railRef.current;
+    if (!rail || cards.length === 0) return 0;
+    const center = rail.scrollLeft + rail.clientWidth / 2;
+    let bestIndex = 0;
+    let bestDist = Number.POSITIVE_INFINITY;
+    cards.forEach((card, index) => {
+      const node = itemRefs.current.get(card.id);
+      if (!node) return;
+      const mid = itemScrollLeft(rail, node) + node.offsetWidth / 2;
+      const dist = Math.abs(mid - center);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIndex = index;
+      }
+    });
+    return bestIndex;
+  }, [cards]);
 
   const scrollToIndex = useCallback(
     (index: number, smooth: boolean) => {
@@ -50,7 +70,10 @@ export function CardCarousel({
       const itemLeft = itemScrollLeft(rail, node);
       const target = Math.max(
         0,
-        itemLeft - (rail.clientWidth - node.offsetWidth) / 2,
+        Math.min(
+          rail.scrollWidth - rail.clientWidth,
+          itemLeft - (rail.clientWidth - node.offsetWidth) / 2,
+        ),
       );
 
       ignoreScrollSelect.current = true;
@@ -65,7 +88,6 @@ export function CardCarousel({
 
       ignoreTimer.current = window.setTimeout(
         () => {
-          // Ensure we land exactly even if a smooth scroll was interrupted.
           if (Math.abs(rail.scrollLeft - target) > 2) {
             rail.scrollLeft = target;
           }
@@ -83,6 +105,17 @@ export function CardCarousel({
     scrollToIndex(selectedIndex, false);
   }, [cardIdsKey]);
 
+  useEffect(() => {
+    return () => {
+      if (ignoreTimer.current !== null) {
+        window.clearTimeout(ignoreTimer.current);
+      }
+      if (settleTimer.current !== null) {
+        window.clearTimeout(settleTimer.current);
+      }
+    };
+  }, []);
+
   const selectByIndex = useCallback(
     (index: number, smooth: boolean) => {
       const card = cards[index];
@@ -93,25 +126,51 @@ export function CardCarousel({
     [cards, onSelect, scrollToIndex],
   );
 
-  const onScroll = useCallback(() => {
-    if (ignoreScrollSelect.current) return;
+  const syncSelectionFromScroll = useCallback(() => {
+    if (ignoreScrollSelect.current || cards.length === 0) return;
+    const index = nearestIndex();
+    const id = cards[index]?.id;
+    if (id && id !== selectedCardId) onSelect(id);
+  }, [cards, nearestIndex, onSelect, selectedCardId]);
+
+  const settleToNearest = useCallback(() => {
+    if (ignoreScrollSelect.current || cards.length === 0) return;
+    const index = nearestIndex();
+    const card = cards[index];
+    if (!card) return;
+
     const rail = railRef.current;
-    if (!rail || cards.length === 0) return;
-    const center = rail.scrollLeft + rail.clientWidth / 2;
-    let bestId = cards[0].id;
-    let bestDist = Number.POSITIVE_INFINITY;
-    for (const card of cards) {
-      const node = itemRefs.current.get(card.id);
-      if (!node) continue;
-      const mid = itemScrollLeft(rail, node) + node.offsetWidth / 2;
-      const dist = Math.abs(mid - center);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestId = card.id;
-      }
+    const node = itemRefs.current.get(card.id);
+    if (!rail || !node) {
+      if (card.id !== selectedCardId) onSelect(card.id);
+      return;
     }
-    if (bestId !== selectedCardId) onSelect(bestId);
-  }, [cards, onSelect, selectedCardId]);
+
+    const itemLeft = itemScrollLeft(rail, node);
+    const target = Math.max(
+      0,
+      Math.min(
+        rail.scrollWidth - rail.clientWidth,
+        itemLeft - (rail.clientWidth - node.offsetWidth) / 2,
+      ),
+    );
+    const offSnap = Math.abs(rail.scrollLeft - target) > 4;
+
+    if (card.id !== selectedCardId || offSnap) {
+      selectByIndex(index, true);
+    }
+  }, [cards, nearestIndex, onSelect, selectByIndex, selectedCardId]);
+
+  const onRailScroll = useCallback(() => {
+    syncSelectionFromScroll();
+    if (settleTimer.current !== null) {
+      window.clearTimeout(settleTimer.current);
+    }
+    settleTimer.current = window.setTimeout(() => {
+      settleTimer.current = null;
+      settleToNearest();
+    }, 100);
+  }, [settleToNearest, syncSelectionFromScroll]);
 
   function go(delta: number) {
     const next = Math.min(cards.length - 1, Math.max(0, selectedIndex + delta));
@@ -139,7 +198,8 @@ export function CardCarousel({
         role="list"
         aria-label="Payment cards"
         tabIndex={cards.length > 1 ? 0 : undefined}
-        onScroll={onScroll}
+        onScroll={onRailScroll}
+        onScrollEnd={settleToNearest}
         onKeyDown={onRailKeyDown}
       >
         {cards.map((card, index) => (
