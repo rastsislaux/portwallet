@@ -160,6 +160,24 @@ img {
   color: var(--ink);
 }
 
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.icon-spin {
+  animation: icon-spin 0.9s linear infinite;
+}
+
+@keyframes icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .brand-mark {
   font-size: var(--text-large);
   line-height: 1.05;
@@ -180,6 +198,17 @@ img {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.header-block--row {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.header-block--row .custody-strip {
+  margin-top: 4px;
 }
 
 .screen-title {

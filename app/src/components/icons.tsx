@@ -10,6 +10,7 @@ import {
   Copy,
   CreditCard,
   Home,
+  RefreshCw,
   Repeat2,
   Settings,
   WalletCards,
@@ -36,6 +37,7 @@ export const IconCards = withDefaults(CreditCard);
 export const IconExchange = withDefaults(Repeat2);
 export const IconAccounts = withDefaults(WalletCards);
 export const IconSettings = withDefaults(Settings);
+export const IconRefresh = withDefaults(RefreshCw);
 export const IconSend = withDefaults(ArrowUpRight);
 export const IconReceive = withDefaults(ArrowDown);
 export const IconChevronDown = withDefaults(ChevronDown);

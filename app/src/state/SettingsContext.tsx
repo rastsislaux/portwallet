@@ -15,6 +15,7 @@ import {
 } from '../fx/currencies';
 import { FX_DATA_SOURCES, fetchUsdToQuote, type FxQuote } from '../fx/rates';
 import { formatFiat, formatFiatParts } from '../components/Amount';
+import { readStoredFxQuote, writeStoredFxQuote } from './fxStorage';
 
 const STORAGE_MAIN_CURRENCY = 'portwallet.mainCurrency';
 const STORAGE_HIDE_BELOW_ENABLED = 'portwallet.hideBelowThreshold.enabled';
@@ -22,6 +23,9 @@ const STORAGE_HIDE_BELOW_AMOUNT = 'portwallet.hideBelowThreshold.amount';
 const STORAGE_HIDE_BELOW_CURRENCY = 'portwallet.hideBelowThreshold.currency';
 
 const DEFAULT_HIDE_BELOW_AMOUNT = 1;
+
+/** How often FX quotes are refreshed while the app stays open. */
+export const FX_POLL_INTERVAL_MS = 300_000;
 
 type RateStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -110,12 +114,31 @@ function resolveActiveQuote(currency: string, quote: FxQuote | null): FxQuote | 
   return quote?.quote === currency ? quote : null;
 }
 
+function initialStoredQuote(currency: string): FxQuote | null {
+  const stored = readStoredFxQuote();
+  if (!stored) return null;
+  if (currency === 'USD') {
+    return stored.quote.quote === 'USD' ? stored.quote : usdIdentityQuote();
+  }
+  return stored.quote.quote === currency ? stored.quote : null;
+}
+
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [mainCurrency, setMainCurrencyState] = useState(() =>
     readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY),
   );
-  const [rateQuote, setRateQuote] = useState<FxQuote | null>(null);
-  const [rateStatus, setRateStatus] = useState<RateStatus>('idle');
+  const [rateQuote, setRateQuote] = useState<FxQuote | null>(() =>
+    initialStoredQuote(
+      readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY),
+    ),
+  );
+  const [rateStatus, setRateStatus] = useState<RateStatus>(() =>
+    initialStoredQuote(
+      readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY),
+    )
+      ? 'ready'
+      : 'idle',
+  );
   const [rateError, setRateError] = useState<string | null>(null);
 
   const [hideBelowThresholdEnabled, setHideBelowEnabledState] = useState(() =>
@@ -160,16 +183,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       const quote = await fetchUsdToQuote(mainCurrency);
       setRateQuote(quote);
+      writeStoredFxQuote(quote);
       setRateStatus('ready');
     } catch (err) {
-      setRateQuote(null);
       setRateStatus('error');
       setRateError(err instanceof Error ? err.message : 'Failed to load exchange rate');
+      setRateQuote((prev) => {
+        const matching = resolveActiveQuote(mainCurrency, prev);
+        return matching ?? prev;
+      });
     }
   }, [mainCurrency]);
 
   useEffect(() => {
     void refreshRate();
+  }, [refreshRate]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void refreshRate();
+    }, FX_POLL_INTERVAL_MS);
+    return () => {
+      window.clearInterval(timer);
+    };
   }, [refreshRate]);
 
   useEffect(() => {
