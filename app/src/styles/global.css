@@ -1674,6 +1674,8 @@ img {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   padding-inline: var(--pad-screen);
+  padding-block: 10px;
+  margin-block: -10px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
@@ -1818,9 +1820,9 @@ img {
 
 .payment-card.is-selected {
   box-shadow:
-    0 0 0 2px var(--bg),
-    0 0 0 3.5px var(--ink),
-    var(--shadow-md);
+    0 10px 28px rgba(0, 0, 0, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
   transform: translateY(-1px);
 }
 
