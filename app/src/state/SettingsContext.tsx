@@ -13,11 +13,19 @@ import {
   getCurrency,
   type FiatCurrency,
 } from '../fx/currencies';
+import {
+  DEFAULT_SECONDARY_CURRENCY,
+  getSecondaryCurrency,
+  isFiatSecondary,
+  listSecondaryCurrencies,
+  type SecondaryCurrency,
+} from '../fx/secondaryCurrencies';
 import { FX_DATA_SOURCES, fetchUsdToQuote, type FxQuote } from '../fx/rates';
 import { formatFiat, formatFiatParts } from '../components/Amount';
 import { readStoredFxQuote, writeStoredFxQuote } from './fxStorage';
 
 const STORAGE_MAIN_CURRENCY = 'portwallet.mainCurrency';
+const STORAGE_SECONDARY_CURRENCY = 'portwallet.secondaryCurrency';
 const STORAGE_HIDE_BELOW_ENABLED = 'portwallet.hideBelowThreshold.enabled';
 const STORAGE_HIDE_BELOW_AMOUNT = 'portwallet.hideBelowThreshold.amount';
 const STORAGE_HIDE_BELOW_CURRENCY = 'portwallet.hideBelowThreshold.currency';
@@ -34,6 +42,11 @@ type SettingsContextValue = {
   displayCurrency: string;
   setMainCurrency: (code: string) => void;
   currencies: FiatCurrency[];
+  secondaryCurrency: string;
+  setSecondaryCurrency: (code: string) => void;
+  secondaryCurrencies: SecondaryCurrency[];
+  /** Units of secondary fiat per 1 USD; null when secondary is crypto or rate unavailable. */
+  usdToSecondaryRate: number | null;
   usdToMainRate: number;
   convertFromUsd: (usdAmount: number) => number;
   formatFromUsd: (usdAmount: number) => string;
@@ -59,6 +72,16 @@ function readStoredCurrency(key: string, fallback: string): string {
   try {
     const stored = localStorage.getItem(key);
     if (stored && getCurrency(stored)) return stored;
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+function readStoredSecondaryCurrency(fallback: string): string {
+  try {
+    const stored = localStorage.getItem(STORAGE_SECONDARY_CURRENCY);
+    if (stored && getSecondaryCurrency(stored)) return stored.toUpperCase();
   } catch {
     /* ignore */
   }
@@ -127,6 +150,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [mainCurrency, setMainCurrencyState] = useState(() =>
     readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY),
   );
+  const [secondaryCurrency, setSecondaryCurrencyState] = useState(() =>
+    readStoredSecondaryCurrency(DEFAULT_SECONDARY_CURRENCY),
+  );
   const [rateQuote, setRateQuote] = useState<FxQuote | null>(() =>
     initialStoredQuote(
       readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY),
@@ -151,12 +177,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     readStoredCurrency(STORAGE_HIDE_BELOW_CURRENCY, readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY)),
   );
   const [thresholdRateQuote, setThresholdRateQuote] = useState<FxQuote | null>(null);
+  const [secondaryRateQuote, setSecondaryRateQuote] = useState<FxQuote | null>(null);
 
   const setMainCurrency = useCallback((code: string) => {
     const next = code.toUpperCase();
     if (!getCurrency(next)) return;
     setMainCurrencyState(next);
     writeStorage(STORAGE_MAIN_CURRENCY, next);
+  }, []);
+
+  const setSecondaryCurrency = useCallback((code: string) => {
+    const next = code.toUpperCase();
+    if (!getSecondaryCurrency(next)) return;
+    setSecondaryCurrencyState(next);
+    writeStorage(STORAGE_SECONDARY_CURRENCY, next);
   }, []);
 
   const setHideBelowThresholdEnabled = useCallback((enabled: boolean) => {
@@ -234,6 +268,37 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, [hideBelowThresholdCurrency, mainCurrency]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isFiatSecondary(secondaryCurrency)) {
+      setSecondaryRateQuote(null);
+      return;
+    }
+
+    if (secondaryCurrency === mainCurrency) {
+      setSecondaryRateQuote(null);
+      return;
+    }
+
+    if (secondaryCurrency === 'USD') {
+      setSecondaryRateQuote(usdIdentityQuote());
+      return;
+    }
+
+    void fetchUsdToQuote(secondaryCurrency)
+      .then((quote) => {
+        if (!cancelled) setSecondaryRateQuote(quote);
+      })
+      .catch(() => {
+        if (!cancelled) setSecondaryRateQuote(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [secondaryCurrency, mainCurrency]);
+
   const activeQuote = resolveActiveQuote(mainCurrency, rateQuote);
   const usdToMainRate = activeQuote?.rate ?? 1;
   const displayCurrency = activeQuote?.quote ?? 'USD';
@@ -242,6 +307,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     hideBelowThresholdCurrency === mainCurrency
       ? activeQuote
       : resolveActiveQuote(hideBelowThresholdCurrency, thresholdRateQuote);
+
+  const secondaryFiatQuote =
+    !isFiatSecondary(secondaryCurrency)
+      ? null
+      : secondaryCurrency === mainCurrency
+        ? activeQuote
+        : resolveActiveQuote(secondaryCurrency, secondaryRateQuote);
+
+  const usdToSecondaryRate = secondaryFiatQuote?.rate ?? null;
 
   const hideBelowThresholdUsd = useMemo(() => {
     if (!hideBelowThresholdEnabled) return null;
@@ -266,12 +340,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [convertFromUsd],
   );
 
+  const secondaryCurrencies = useMemo(() => listSecondaryCurrencies(), []);
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       mainCurrency,
       displayCurrency,
       setMainCurrency,
       currencies: MAIN_CURRENCIES,
+      secondaryCurrency,
+      setSecondaryCurrency,
+      secondaryCurrencies,
+      usdToSecondaryRate,
       usdToMainRate,
       convertFromUsd,
       formatFromUsd,
@@ -293,6 +373,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       mainCurrency,
       displayCurrency,
       setMainCurrency,
+      secondaryCurrency,
+      setSecondaryCurrency,
+      secondaryCurrencies,
+      usdToSecondaryRate,
       usdToMainRate,
       convertFromUsd,
       formatFromUsd,

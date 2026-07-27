@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
-import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
+import { formatAssetQty, formatFiat } from '../components/Amount';
 import {
   CryptoIcon,
   IconExchange,
@@ -12,6 +12,7 @@ import {
 } from '../components/icons';
 import { PwaInstallBanner } from '../components/PwaInstallBanner';
 import { formatPurchasePnl } from '../domain/costBasis';
+import { formatSecondaryApprox } from '../fx/formatSecondaryApprox';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -54,6 +55,9 @@ export function HomeScreen() {
     hideBelowThresholdUsd,
     hideBelowThresholdAmount,
     hideBelowThresholdCurrency,
+    mainCurrency,
+    secondaryCurrency,
+    usdToSecondaryRate,
   } = useSettings();
 
   const visibleAssets = useMemo(() => {
@@ -63,10 +67,17 @@ export function HomeScreen() {
 
   const hiddenCount = assets.length - visibleAssets.length;
 
-  const btc = assets.find((a) => a.symbol === 'BTC');
-  const btcApprox = btc
-    ? formatQty(totalFiatUsd / (btc.fiatValueUsd / btc.quantity || 68420), 4)
-    : formatQty(totalFiatUsd / 68420, 4);
+  const secondaryApprox = useMemo(
+    () =>
+      formatSecondaryApprox({
+        totalFiatUsd,
+        secondaryCode: secondaryCurrency,
+        mainCurrency,
+        assets,
+        usdToSecondaryRate,
+      }),
+    [totalFiatUsd, secondaryCurrency, mainCurrency, assets, usdToSecondaryRate],
+  );
   const balance = formatFromUsdParts(totalFiatUsd);
   const updatedLabel = formatUpdatedAt(lastUpdatedAt);
 
@@ -143,7 +154,9 @@ export function HomeScreen() {
               <span className="portfolio-total__dec">.{balance.decimal}</span>
               <span className="portfolio-total__currency">{displayCurrency}</span>
             </div>
-            <div className="portfolio-total__meta">≈ {btcApprox} BTC</div>
+            {secondaryApprox ? (
+              <div className="portfolio-total__meta">{secondaryApprox}</div>
+            ) : null}
           </div>
 
           <div className="action-row">
@@ -165,18 +178,16 @@ export function HomeScreen() {
             <div className="section-label">Assets</div>
             <div className="asset-list">
               {visibleAssets.map((asset) => {
+                const pnlUsd = asset.unrealizedPnlUsd;
+                const pnlPct = asset.unrealizedPnlPct;
                 const hasPnl =
-                  asset.unrealizedPnlUsd != null &&
-                  asset.unrealizedPnlPct != null &&
-                  Number.isFinite(asset.unrealizedPnlUsd) &&
-                  Number.isFinite(asset.unrealizedPnlPct);
-                const tone = assetSecondaryTone(asset.unrealizedPnlUsd);
+                  pnlUsd != null &&
+                  pnlPct != null &&
+                  Number.isFinite(pnlUsd) &&
+                  Number.isFinite(pnlPct);
+                const tone = assetSecondaryTone(pnlUsd);
                 const secondary = hasPnl
-                  ? formatPurchasePnl(
-                      asset.unrealizedPnlPct!,
-                      asset.unrealizedPnlUsd!,
-                      formatFromUsd,
-                    )
+                  ? formatPurchasePnl(pnlPct, pnlUsd, formatFromUsd)
                   : asset.name;
 
                 return (
