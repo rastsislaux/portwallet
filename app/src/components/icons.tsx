@@ -8,12 +8,14 @@ import {
   ChevronDown,
   Copy,
   CreditCard,
+  Download,
   History,
   Home,
   RefreshCw,
   Repeat2,
   Settings,
   WalletCards,
+  X,
   type LucideProps,
 } from 'lucide-react';
 import type { ProviderType } from '../domain/types';
@@ -46,6 +48,8 @@ export const IconSwap = withDefaults(ArrowDownUp);
 export const IconCopy = withDefaults(Copy);
 export const IconBack = withDefaults(ArrowLeft);
 export const IconCheck = withDefaults(Check);
+export const IconDownload = withDefaults(Download);
+export const IconX = withDefaults(X);
 
 const providerMeta: Record<
   ProviderType,

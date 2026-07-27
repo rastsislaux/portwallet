@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { IconAccounts, IconBack, IconChevronDown } from '../components/icons';
+import { IconAccounts, IconBack, IconChevronDown, IconDownload } from '../components/icons';
+import { usePwaInstall } from '../state/PwaInstallContext';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -22,6 +23,12 @@ export function SettingsScreen() {
     setHideBelowThresholdCurrency,
   } = useSettings();
   const { refresh, isRefreshing, lastUpdatedAt, accounts } = useWallet();
+  const {
+    showInstallInSettings,
+    installHint,
+    promptInstall,
+    showInstallButtonAgain,
+  } = usePwaInstall();
 
   const selected = currencies.find((c) => c.code === mainCurrency);
   const [amountText, setAmountText] = useState(() => String(hideBelowThresholdAmount));
@@ -168,6 +175,42 @@ export function SettingsScreen() {
           ) : null}
         </p>
       </div>
+
+      {showInstallInSettings ? (
+        <div className="section-block">
+          <div className="section-label">App</div>
+          <div className="grouped-list">
+            <div className="grouped-row grouped-row--field">
+              <div className="grouped-row__body">
+                <div className="grouped-row__title">Install Portwallet</div>
+                <div className="grouped-row__meta">
+                  {installHint ?? 'Add to your home screen for quick access'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn--text"
+                onClick={() => {
+                  void promptInstall();
+                }}
+              >
+                <IconDownload size={16} strokeWidth={2.25} />
+                Install
+              </button>
+            </div>
+          </div>
+          <p className="settings-rate-meta">
+            You hid the install button on Home.{' '}
+            <button
+              type="button"
+              className="text-button"
+              onClick={showInstallButtonAgain}
+            >
+              Show it again
+            </button>
+          </p>
+        </div>
+      ) : null}
 
       <div className="section-block">
         <div className="section-label">Accounts</div>

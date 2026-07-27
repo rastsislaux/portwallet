@@ -10,6 +10,7 @@ import {
   IconSend,
   IconSettings,
 } from '../components/icons';
+import { PwaInstallBanner } from '../components/PwaInstallBanner';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -65,6 +66,7 @@ export function HomeScreen() {
         <div className="brand-header">
           <div className="brand-mark">Portwallet</div>
         </div>
+        <PwaInstallBanner />
         <p className="loading-line">Loading accounts…</p>
       </section>
     );
@@ -110,6 +112,8 @@ export function HomeScreen() {
             : null}
         </p>
       </header>
+
+      <PwaInstallBanner />
 
       {accounts.length === 0 ? (
         <div className="empty">
