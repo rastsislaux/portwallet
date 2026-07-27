@@ -16,6 +16,12 @@ type CardCarouselProps = {
   onSelect: (cardId: string) => void;
 };
 
+function itemScrollLeft(rail: HTMLElement, node: HTMLElement): number {
+  const railRect = rail.getBoundingClientRect();
+  const nodeRect = node.getBoundingClientRect();
+  return nodeRect.left - railRect.left + rail.scrollLeft;
+}
+
 export function CardCarousel({
   cards,
   selectedCardId,
@@ -25,6 +31,7 @@ export function CardCarousel({
   const railRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLDivElement>());
   const ignoreScrollSelect = useRef(false);
+  const ignoreTimer = useRef<number | null>(null);
 
   const cardIdsKey = useMemo(() => cards.map((c) => c.id).join('|'), [cards]);
   const selectedIndex = Math.max(
@@ -34,21 +41,38 @@ export function CardCarousel({
 
   const scrollToIndex = useCallback(
     (index: number, smooth: boolean) => {
+      const rail = railRef.current;
       const card = cards[index];
-      if (!card) return;
+      if (!rail || !card) return;
       const node = itemRefs.current.get(card.id);
       if (!node) return;
+
+      const itemLeft = itemScrollLeft(rail, node);
+      const target = Math.max(
+        0,
+        itemLeft - (rail.clientWidth - node.offsetWidth) / 2,
+      );
+
       ignoreScrollSelect.current = true;
-      node.scrollIntoView({
-        behavior: smooth ? 'smooth' : 'instant',
-        inline: 'center',
-        block: 'nearest',
+      if (ignoreTimer.current !== null) {
+        window.clearTimeout(ignoreTimer.current);
+      }
+
+      rail.scrollTo({
+        left: target,
+        behavior: smooth ? 'smooth' : 'auto',
       });
-      window.setTimeout(
+
+      ignoreTimer.current = window.setTimeout(
         () => {
+          // Ensure we land exactly even if a smooth scroll was interrupted.
+          if (Math.abs(rail.scrollLeft - target) > 2) {
+            rail.scrollLeft = target;
+          }
           ignoreScrollSelect.current = false;
+          ignoreTimer.current = null;
         },
-        smooth ? 420 : 50,
+        smooth ? 500 : 50,
       );
     },
     [cards],
@@ -57,19 +81,17 @@ export function CardCarousel({
   useEffect(() => {
     if (!selectedCardId || cards.length === 0) return;
     scrollToIndex(selectedIndex, false);
-  }, [cardIdsKey, scrollToIndex, selectedCardId, selectedIndex, cards.length]);
+  }, [cardIdsKey]);
 
-  useEffect(() => {
-    if (!selectedCardId) return;
-    const rail = railRef.current;
-    const item = itemRefs.current.get(selectedCardId);
-    if (!rail || !item) return;
-    const railCenter = rail.scrollLeft + rail.clientWidth / 2;
-    const itemCenter = item.offsetLeft + item.offsetWidth / 2;
-    if (Math.abs(railCenter - itemCenter) > item.offsetWidth * 0.35) {
-      scrollToIndex(selectedIndex, true);
-    }
-  }, [selectedCardId, selectedIndex, scrollToIndex]);
+  const selectByIndex = useCallback(
+    (index: number, smooth: boolean) => {
+      const card = cards[index];
+      if (!card) return;
+      onSelect(card.id);
+      scrollToIndex(index, smooth);
+    },
+    [cards, onSelect, scrollToIndex],
+  );
 
   const onScroll = useCallback(() => {
     if (ignoreScrollSelect.current) return;
@@ -81,7 +103,7 @@ export function CardCarousel({
     for (const card of cards) {
       const node = itemRefs.current.get(card.id);
       if (!node) continue;
-      const mid = node.offsetLeft + node.offsetWidth / 2;
+      const mid = itemScrollLeft(rail, node) + node.offsetWidth / 2;
       const dist = Math.abs(mid - center);
       if (dist < bestDist) {
         bestDist = dist;
@@ -93,10 +115,8 @@ export function CardCarousel({
 
   function go(delta: number) {
     const next = Math.min(cards.length - 1, Math.max(0, selectedIndex + delta));
-    const card = cards[next];
-    if (!card) return;
-    onSelect(card.id);
-    scrollToIndex(next, true);
+    if (next === selectedIndex) return;
+    selectByIndex(next, true);
   }
 
   function onRailKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -122,7 +142,7 @@ export function CardCarousel({
         onScroll={onScroll}
         onKeyDown={onRailKeyDown}
       >
-        {cards.map((card) => (
+        {cards.map((card, index) => (
           <div
             key={card.id}
             className="card-rail__item"
@@ -136,7 +156,7 @@ export function CardCarousel({
               card={card}
               accountNickname={accountNickname(card)}
               selected={card.id === selectedCardId}
-              onSelect={() => onSelect(card.id)}
+              onSelect={() => selectByIndex(index, true)}
             />
           </div>
         ))}
@@ -154,20 +174,20 @@ export function CardCarousel({
             <ChevronLeft size={18} strokeWidth={2.25} aria-hidden />
           </button>
           <div className="card-carousel__dots" role="tablist" aria-label="Card pages">
-            {cards.map((card, index) => (
-              <button
-                key={card.id}
-                type="button"
-                role="tab"
-                aria-label={`Show card ${index + 1} of ${cards.length}`}
-                aria-selected={card.id === selectedCardId}
-                className={`card-carousel__dot${card.id === selectedCardId ? ' is-active' : ''}`}
-                onClick={() => {
-                  onSelect(card.id);
-                  scrollToIndex(index, true);
-                }}
-              />
-            ))}
+            {cards.map((card, index) => {
+              const active = card.id === selectedCardId;
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  role="tab"
+                  aria-label={`Show card ${index + 1} of ${cards.length}`}
+                  aria-selected={active}
+                  className={`card-carousel__dot${active ? ' is-active' : ''}`}
+                  onClick={() => selectByIndex(index, true)}
+                />
+              );
+            })}
           </div>
           <button
             type="button"

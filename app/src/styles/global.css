@@ -1637,14 +1637,13 @@ img {
 }
 
 .card-rail {
+  position: relative;
   display: flex;
   flex-direction: row;
   align-items: stretch;
   gap: var(--space-3);
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  scroll-padding-inline: var(--pad-screen);
   padding-inline: var(--pad-screen);
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -1655,10 +1654,9 @@ img {
 }
 
 .card-rail__item {
-  flex: 0 0 min(100%, 340px);
-  width: min(100%, 340px);
-  max-width: 100%;
-  scroll-snap-align: center;
+  flex: 0 0 85%;
+  width: 85%;
+  max-width: 360px;
 }
 
 @media (max-width: 420px) {
@@ -1704,24 +1702,34 @@ img {
 .card-carousel__dots {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .card-carousel__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.card-carousel__dot::after {
+  content: '';
   width: 7px;
   height: 7px;
-  border: 0;
   border-radius: 999px;
-  padding: 0;
   background: var(--ink-quaternary);
-  cursor: pointer;
   transition:
     width var(--duration-fast) var(--ease),
     background var(--duration-fast) var(--ease);
 }
 
-.card-carousel__dot.is-active {
-  width: 18px;
+.card-carousel__dot.is-active::after {
+  width: 16px;
   background: var(--ink);
 }
 
