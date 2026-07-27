@@ -127,10 +127,9 @@ export function HomeScreen() {
             >
               <span className="portfolio-total__int">{balance.integer}</span>
               <span className="portfolio-total__dec">.{balance.decimal}</span>
+              <span className="portfolio-total__currency">{displayCurrency}</span>
             </div>
-            <div className="portfolio-total__meta">
-              {displayCurrency} ≈ {btcApprox} BTC
-            </div>
+            <div className="portfolio-total__meta">≈ {btcApprox} BTC</div>
           </div>
 
           <div className="action-row">
