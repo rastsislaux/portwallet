@@ -273,6 +273,14 @@ img {
   letter-spacing: -0.045em;
 }
 
+.portfolio-total__currency {
+  margin-left: 0.28em;
+  font-size: 0.42em;
+  font-weight: 550;
+  letter-spacing: var(--tracking-meta);
+  color: var(--ink-secondary);
+}
+
 .portfolio-total__meta {
   font-size: var(--text-caption);
   line-height: 18px;
