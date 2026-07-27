@@ -11,6 +11,7 @@ import {
   IconSettings,
 } from '../components/icons';
 import { PwaInstallBanner } from '../components/PwaInstallBanner';
+import { formatPurchasePnl } from '../domain/costBasis';
 import { formatSecondaryApprox } from '../fx/formatSecondaryApprox';
 import { usePortfolioDayChange } from '../hooks/usePortfolioDayChange';
 import { useSettings } from '../state/SettingsContext';
@@ -26,6 +27,15 @@ function formatUpdatedAt(iso: string | null): string | null {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function assetSecondaryTone(
+  pnlUsd: number | null | undefined,
+): 'up' | 'down' | 'flat' | null {
+  if (pnlUsd == null || !Number.isFinite(pnlUsd)) return null;
+  if (pnlUsd > 0) return 'up';
+  if (pnlUsd < 0) return 'down';
+  return 'flat';
 }
 
 function formatSignedFiat(value: number): string {
@@ -223,25 +233,49 @@ export function HomeScreen() {
           <div className="section-block">
             <div className="section-label">Assets</div>
             <div className="asset-list">
-              {visibleAssets.map((asset) => (
-                <Link
-                  key={asset.assetId}
-                  className="asset-row"
-                  to={`/asset/${asset.assetId}`}
-                >
-                  <span className="asset-row__icon">
-                    <CryptoIcon symbol={asset.symbol} name={asset.name} size={40} decorative />
-                  </span>
-                  <span className="asset-row__symbol">{asset.symbol}</span>
-                  <span className="asset-row__qty tabular">
-                    {formatAssetQty(asset.symbol, asset.quantity)}
-                  </span>
-                  <span className="asset-row__name">{asset.name}</span>
-                  <span className="asset-row__fiat tabular">
-                    {formatFromUsd(asset.fiatValueUsd)}
-                  </span>
-                </Link>
-              ))}
+              {visibleAssets.map((asset) => {
+                const pnlUsd = asset.unrealizedPnlUsd;
+                const pnlPct = asset.unrealizedPnlPct;
+                const hasPnl =
+                  pnlUsd != null &&
+                  pnlPct != null &&
+                  Number.isFinite(pnlUsd) &&
+                  Number.isFinite(pnlPct);
+                const tone = assetSecondaryTone(pnlUsd);
+                const secondary = hasPnl
+                  ? formatPurchasePnl(pnlPct, pnlUsd, formatFromUsd)
+                  : asset.name;
+
+                return (
+                  <Link
+                    key={asset.assetId}
+                    className="asset-row"
+                    to={`/asset/${asset.assetId}`}
+                  >
+                    <span className="asset-row__icon">
+                      <CryptoIcon symbol={asset.symbol} name={asset.name} size={40} decorative />
+                    </span>
+                    <span className="asset-row__symbol">{asset.symbol}</span>
+                    <span className="asset-row__qty tabular">
+                      {formatAssetQty(asset.symbol, asset.quantity)}
+                    </span>
+                    <span
+                      className={[
+                        'asset-row__name',
+                        'tabular',
+                        tone ? `asset-row__name--${tone}` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {secondary}
+                    </span>
+                    <span className="asset-row__fiat tabular">
+                      {formatFromUsd(asset.fiatValueUsd)}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
             {hiddenCount > 0 ? (
               <p className="asset-list__hidden-note">

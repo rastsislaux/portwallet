@@ -700,6 +700,18 @@ img {
   font-weight: 400;
 }
 
+.asset-row__name--up {
+  color: var(--success);
+}
+
+.asset-row__name--down {
+  color: var(--danger);
+}
+
+.asset-row__name--flat {
+  color: var(--ink-tertiary);
+}
+
 .asset-row__qty,
 .asset-row__fiat {
   text-align: right;
