@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { formatQty } from '../components/Amount';
+import { formatAssetQty, formatQty } from '../components/Amount';
 import {
   CryptoIcon,
   IconBack,
@@ -35,25 +35,41 @@ export function AssetDetailScreen() {
   const recent = transactions
     .filter((t) => t.assetSymbol === asset.symbol || t.counterAssetSymbol === asset.symbol)
     .slice(0, 5);
+  const showName = asset.name.trim().toUpperCase() !== asset.symbol.toUpperCase();
+  const unitPriceUsd =
+    asset.quantity > 0 ? asset.fiatValueUsd / asset.quantity : null;
+  const unitRateLabel =
+    unitPriceUsd != null && Number.isFinite(unitPriceUsd)
+      ? `1 ${asset.symbol} = ${formatFromUsd(unitPriceUsd)}`
+      : null;
 
   return (
-    <section className="screen">
+    <section className="screen screen--asset">
       <button type="button" className="back-link" onClick={() => navigate(-1)}>
         <IconBack size={20} />
         Back
       </button>
-      <header className="header-block">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <CryptoIcon symbol={asset.symbol} name={asset.name} size={44} decorative />
-          <h1 className="screen-title">{asset.name}</h1>
+
+      <header className="asset-hero">
+        <div className="asset-hero__identity">
+          <CryptoIcon symbol={asset.symbol} name={asset.name} size={48} decorative />
+          <div className="asset-hero__titles">
+            <h1 className="asset-hero__symbol">{asset.symbol}</h1>
+            {showName ? <p className="asset-hero__name">{asset.name}</p> : null}
+          </div>
         </div>
-        <div className="portfolio-total">
-          <div className="portfolio-total__value tabular" style={{ fontSize: 40 }}>
-            {formatQty(asset.quantity)} {asset.symbol}
+
+        <div className="asset-hero__balance">
+          <div
+            className="asset-hero__qty tabular"
+            aria-label={`${formatAssetQty(asset.symbol, asset.quantity)} ${asset.symbol}`}
+          >
+            {formatAssetQty(asset.symbol, asset.quantity)}
           </div>
-          <div className="portfolio-total__meta">
-            {formatFromUsd(asset.fiatValueUsd)}
-          </div>
+          <div className="asset-hero__fiat">{formatFromUsd(asset.fiatValueUsd)}</div>
+          {unitRateLabel ? (
+            <div className="asset-hero__rate">{unitRateLabel}</div>
+          ) : null}
         </div>
       </header>
 
@@ -72,8 +88,8 @@ export function AssetDetailScreen() {
         </Link>
       </div>
 
-      <div className="section-block">
-        <div className="section-label">Held in</div>
+      <div className="section-block section-block--secondary">
+        <div className="section-label section-label--quiet">Held in</div>
         <div className="grouped-list">
           {holdings.map((h) => {
             const account = accounts.find((a) => a.id === h.accountId);
@@ -112,8 +128,8 @@ export function AssetDetailScreen() {
         </div>
       ) : null}
 
-      <div className="section-block">
-        <div className="section-label">Recent</div>
+      <div className="section-block section-block--secondary">
+        <div className="section-label section-label--quiet">Recent</div>
         <div className="tx-list">
           {recent.length === 0 ? (
             <p className="muted" style={{ padding: '16px' }}>No recent activity.</p>

@@ -100,6 +100,105 @@ img {
   margin-bottom: var(--space-9);
 }
 
+.screen--asset {
+  gap: 0;
+}
+
+.screen--asset .back-link {
+  margin-bottom: var(--space-5);
+}
+
+.screen--asset .action-row {
+  margin-bottom: var(--space-9);
+}
+
+.screen--asset .section-block--secondary {
+  margin-bottom: var(--space-6);
+}
+
+.screen--asset .section-block--secondary:last-child {
+  margin-bottom: 0;
+}
+
+/* ─── Asset detail hero ─────────────────────────────────── */
+
+.asset-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-bottom: var(--space-7);
+}
+
+.asset-hero__identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.asset-hero__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.asset-hero__symbol {
+  margin: 0;
+  font-size: var(--text-title1);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: var(--tracking-display);
+}
+
+.asset-hero__name {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--ink-tertiary);
+  letter-spacing: var(--tracking-meta);
+}
+
+.asset-hero__balance {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0 0;
+}
+
+.asset-hero__qty {
+  font-size: var(--text-balance);
+  line-height: var(--leading-tight);
+  font-weight: 600;
+  letter-spacing: -0.055em;
+}
+
+.asset-hero__fiat {
+  font-size: var(--text-title3);
+  line-height: 1.25;
+  font-weight: 510;
+  color: var(--ink-secondary);
+  letter-spacing: -0.02em;
+}
+
+.asset-hero__rate {
+  font-size: var(--text-caption);
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--ink-quaternary);
+  letter-spacing: var(--tracking-meta);
+}
+
+.section-label--quiet {
+  font-size: var(--text-caption);
+  line-height: 18px;
+  font-weight: 510;
+  color: var(--ink-tertiary);
+  letter-spacing: var(--tracking-meta);
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+
 .screen--exchange {
   gap: var(--space-5);
   min-height: calc(100dvh - var(--pad-screen-top) - var(--pad-nav) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
