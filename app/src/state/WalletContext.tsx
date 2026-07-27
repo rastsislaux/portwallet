@@ -35,6 +35,16 @@ import {
   updateSavedAccount,
   type SavedAccountCredentials,
 } from './accountStorage';
+import {
+  findPortfolioSnapshot,
+  mergePortfolioCache,
+  readPortfolioCache,
+  remapSnapshotToAccount,
+  removePortfolioCacheBySavedId,
+  removePortfolioCacheEntry,
+  writePortfolioCache,
+  type PortfolioAccountSnapshot,
+} from './portfolioStorage';
 import { BybitCryptoProvider } from '../providers/bybit/BybitCryptoProvider';
 import { isBybitRateLimitError } from '../providers/bybit/client';
 
@@ -58,8 +68,16 @@ export type CardDataWarning = {
   message: string;
 };
 
+/** How often portfolio data is refreshed while the app stays open. */
+export const PORTFOLIO_POLL_INTERVAL_MS = 120_000;
+
+/** Re-fetch when the app becomes visible again if data is older than this. */
+export const PORTFOLIO_VISIBILITY_STALE_MS = 30_000;
+
 type WalletContextValue = {
   ready: boolean;
+  isRefreshing: boolean;
+  lastUpdatedAt: string | null;
   accounts: WalletAccount[];
   filter: AccountFilter;
   setFilter: (filter: AccountFilter) => void;
@@ -166,8 +184,68 @@ function describeCardLoadFailure(err: unknown, nickname: string): string {
   return `Could not refresh card data for ${nickname}. Showing the last loaded data.`;
 }
 
+function applyHydratedPortfolio(
+  accounts: WalletAccount[],
+  savedIdByInstance: Map<string, string>,
+): {
+  balances: AssetBalance[];
+  transactions: Transaction[];
+  cards: ProviderCard[];
+  cardOperations: CardOperation[];
+  accountCardStatuses: AccountCardStatus[];
+  fundingByAccountId: Record<string, FundingAssetBalance[]>;
+  updatedAt: string | null;
+} | null {
+  const cache = readPortfolioCache();
+  if (!cache || accounts.length === 0) return null;
+
+  const bals: AssetBalance[] = [];
+  const txs: Transaction[] = [];
+  const nextCards: ProviderCard[] = [];
+  const nextOps: CardOperation[] = [];
+  const statuses: AccountCardStatus[] = [];
+  const fundingMap: Record<string, FundingAssetBalance[]> = {};
+  let matched = 0;
+
+  for (const account of accounts) {
+    const savedId = savedIdByInstance.get(account.providerInstanceId);
+    if (!savedId) continue;
+    const raw = findPortfolioSnapshot(cache, savedId, account.product);
+    if (!raw) continue;
+    matched += 1;
+    const snapshot = remapSnapshotToAccount(raw, account.id);
+    bals.push(...snapshot.balances);
+    txs.push(...snapshot.transactions);
+    nextCards.push(...snapshot.cards);
+    nextOps.push(...snapshot.cardOperations);
+    statuses.push({
+      account,
+      capability: snapshot.capability,
+      cards: snapshot.cards,
+    });
+    fundingMap[account.id] = snapshot.funding;
+  }
+
+  if (matched === 0) return null;
+
+  txs.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  nextOps.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+
+  return {
+    balances: bals,
+    transactions: txs,
+    cards: nextCards,
+    cardOperations: nextOps,
+    accountCardStatuses: statuses,
+    fundingByAccountId: fundingMap,
+    updatedAt: cache.updatedAt,
+  };
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<WalletAccount[]>([]);
   const [filter, setFilter] = useState<AccountFilter>('all');
   const [balances, setBalances] = useState<AssetBalance[]>([]);
@@ -186,6 +264,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const cardsRef = useRef<ProviderCard[]>([]);
   const cardOperationsRef = useRef<CardOperation[]>([]);
   const fundingRef = useRef<Record<string, FundingAssetBalance[]>>({});
+  const refreshingRef = useRef(false);
+  const refreshGen = useRef(0);
+  const lastUpdatedAtRef = useRef<string | null>(null);
 
   useEffect(() => {
     cardsRef.current = cards;
@@ -196,6 +277,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fundingRef.current = fundingByAccountId;
   }, [fundingByAccountId]);
+  useEffect(() => {
+    lastUpdatedAtRef.current = lastUpdatedAt;
+  }, [lastUpdatedAt]);
 
   const selectedAccounts = useMemo(() => {
     if (filter === 'all') return accounts;
@@ -203,6 +287,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [accounts, filter]);
 
   const refresh = useCallback(async () => {
+    const gen = ++refreshGen.current;
+    refreshingRef.current = true;
+    setIsRefreshing(true);
+
     const bals: AssetBalance[] = [];
     const txs: Transaction[] = [];
     const nextCards: ProviderCard[] = [];
@@ -210,56 +298,104 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const statuses: AccountCardStatus[] = [];
     const fundingMap: Record<string, FundingAssetBalance[]> = {};
     const warnings: CardDataWarning[] = [];
+    const snapshots: PortfolioAccountSnapshot[] = [];
 
-    for (const account of selectedAccounts) {
-      const provider = registry.getForAccount(account.id);
-      bals.push(...(await provider.listBalances(account.id)));
-      txs.push(...(await provider.getTransactions(account.id)));
+    try {
+      for (const account of selectedAccounts) {
+        const provider = registry.getForAccount(account.id);
+        const accountBalances = await provider.listBalances(account.id);
+        const accountTxs = await provider.getTransactions(account.id);
+        bals.push(...accountBalances);
+        txs.push(...accountTxs);
 
-      const capability = await provider.getCardCapability(account.id);
-      if (!capability.supported) {
-        statuses.push({ account, capability, cards: [] });
-        fundingMap[account.id] = [];
-        continue;
+        const capability = await provider.getCardCapability(account.id);
+        let accountCards: ProviderCard[] = [];
+        let ops: CardOperation[] = [];
+        let funding: FundingAssetBalance[] = [];
+
+        if (!capability.supported) {
+          statuses.push({ account, capability, cards: [] });
+          fundingMap[account.id] = [];
+        } else {
+          try {
+            accountCards = await provider.listCards(account.id);
+            ops = await provider.getCardOperations(account.id);
+            funding = await provider.listFundingBalances(account.id);
+            nextCards.push(...accountCards);
+            nextOps.push(...ops);
+            statuses.push({ account, capability, cards: accountCards });
+            fundingMap[account.id] = funding;
+          } catch (err) {
+            const priorCards = cardsRef.current.filter(
+              (c) => c.accountId === account.id,
+            );
+            const priorOps = cardOperationsRef.current.filter(
+              (o) => o.accountId === account.id,
+            );
+            const priorFunding = fundingRef.current[account.id] ?? [];
+            accountCards = priorCards;
+            ops = priorOps;
+            funding = priorFunding;
+            nextCards.push(...priorCards);
+            nextOps.push(...priorOps);
+            statuses.push({ account, capability, cards: priorCards });
+            fundingMap[account.id] = priorFunding;
+            warnings.push({
+              accountId: account.id,
+              nickname: account.nickname,
+              message: describeCardLoadFailure(err, account.nickname),
+            });
+          }
+        }
+
+        const savedId = instanceToSavedId.current.get(account.providerInstanceId);
+        if (savedId) {
+          snapshots.push({
+            savedId,
+            accountId: account.id,
+            product: account.product,
+            providerType: account.providerType,
+            nickname: account.nickname,
+            capability,
+            balances: accountBalances,
+            transactions: accountTxs,
+            cards: accountCards,
+            cardOperations: ops,
+            funding,
+          });
+        }
       }
 
-      try {
-        const accountCards = await provider.listCards(account.id);
-        const ops = await provider.getCardOperations(account.id);
-        const funding = await provider.listFundingBalances(account.id);
-        nextCards.push(...accountCards);
-        nextOps.push(...ops);
-        statuses.push({ account, capability, cards: accountCards });
-        fundingMap[account.id] = funding;
-      } catch (err) {
-        const priorCards = cardsRef.current.filter(
-          (c) => c.accountId === account.id,
+      if (gen !== refreshGen.current) return;
+
+      txs.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      nextOps.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      setBalances(bals);
+      setTransactions(txs);
+      setCards(nextCards);
+      setCardOperations(nextOps);
+      setAccountCardStatuses(statuses);
+      setFundingByAccountId(fundingMap);
+      setCardWarnings(warnings);
+
+      if (snapshots.length > 0) {
+        const updatedAt = new Date().toISOString();
+        const nextCache = mergePortfolioCache(
+          readPortfolioCache(),
+          snapshots,
+          updatedAt,
         );
-        const priorOps = cardOperationsRef.current.filter(
-          (o) => o.accountId === account.id,
-        );
-        const priorFunding = fundingRef.current[account.id] ?? [];
-        nextCards.push(...priorCards);
-        nextOps.push(...priorOps);
-        statuses.push({ account, capability, cards: priorCards });
-        fundingMap[account.id] = priorFunding;
-        warnings.push({
-          accountId: account.id,
-          nickname: account.nickname,
-          message: describeCardLoadFailure(err, account.nickname),
-        });
+        writePortfolioCache(nextCache);
+        setLastUpdatedAt(updatedAt);
+      } else if (selectedAccounts.length === 0) {
+        setLastUpdatedAt(new Date().toISOString());
+      }
+    } finally {
+      if (gen === refreshGen.current) {
+        refreshingRef.current = false;
+        setIsRefreshing(false);
       }
     }
-
-    txs.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    nextOps.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    setBalances(bals);
-    setTransactions(txs);
-    setCards(nextCards);
-    setCardOperations(nextOps);
-    setAccountCardStatuses(statuses);
-    setFundingByAccountId(fundingMap);
-    setCardWarnings(warnings);
   }, [selectedAccounts]);
 
   const didBootstrap = useRef(false);
@@ -300,6 +436,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const hydrated = applyHydratedPortfolio(
+        restored,
+        instanceToSavedId.current,
+      );
+      if (hydrated) {
+        setBalances(hydrated.balances);
+        setTransactions(hydrated.transactions);
+        setCards(hydrated.cards);
+        setCardOperations(hydrated.cardOperations);
+        setAccountCardStatuses(hydrated.accountCardStatuses);
+        setFundingByAccountId(hydrated.fundingByAccountId);
+        setLastUpdatedAt(hydrated.updatedAt);
+      }
+
       setAccounts(restored);
       setRestoreFailures(failures);
       setReady(true);
@@ -309,6 +459,39 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     void refresh();
+  }, [ready, refresh]);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const timer = window.setInterval(() => {
+      if (!refreshingRef.current) {
+        void refresh();
+      }
+    }, PORTFOLIO_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [ready, refresh]);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (refreshingRef.current) return;
+      const updatedAt = lastUpdatedAtRef.current;
+      const age = updatedAt ? Date.now() - Date.parse(updatedAt) : Number.POSITIVE_INFINITY;
+      if (!Number.isFinite(age) || age >= PORTFOLIO_VISIBILITY_STALE_MS) {
+        void refresh();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [ready, refresh]);
 
   const assets = useMemo(() => aggregate(balances), [balances]);
@@ -394,30 +577,47 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const removeAccount = useCallback(async (accountId: string) => {
     const provider = registry.getForAccount(accountId);
+    const removed = accounts.find((a) => a.id === accountId);
     await provider.disconnect(accountId);
     registry.unbindAccount(accountId);
-    setAccounts((prev) => {
-      const removed = prev.find((a) => a.id === accountId);
-      const next = prev.filter((a) => a.id !== accountId);
-      if (removed) {
-        const stillConnected = next.some(
-          (a) => a.providerInstanceId === removed.providerInstanceId,
-        );
+
+    const nextAccounts = accounts.filter((a) => a.id !== accountId);
+    if (removed) {
+      const stillConnected = nextAccounts.some(
+        (a) => a.providerInstanceId === removed.providerInstanceId,
+      );
+      const savedId = instanceToSavedId.current.get(removed.providerInstanceId);
+      if (savedId) {
         if (!stillConnected) {
-          const savedId = instanceToSavedId.current.get(removed.providerInstanceId);
-          if (savedId) {
-            removeSavedAccount(savedId);
-            instanceToSavedId.current.delete(removed.providerInstanceId);
-          }
+          removeSavedAccount(savedId);
+          instanceToSavedId.current.delete(removed.providerInstanceId);
+          removePortfolioCacheBySavedId(savedId);
+        } else {
+          removePortfolioCacheEntry(savedId, removed.product);
         }
       }
+    }
+
+    setAccounts(nextAccounts);
+    setFilter((f) => (f === accountId ? 'all' : f));
+    setBalances((prev) => prev.filter((row) => row.accountId !== accountId));
+    setTransactions((prev) => prev.filter((row) => row.accountId !== accountId));
+    setCards((prev) => prev.filter((row) => row.accountId !== accountId));
+    setCardOperations((prev) => prev.filter((row) => row.accountId !== accountId));
+    setAccountCardStatuses((prev) =>
+      prev.filter((row) => row.account.id !== accountId),
+    );
+    setFundingByAccountId((prev) => {
+      if (!(accountId in prev)) return prev;
+      const next = { ...prev };
+      delete next[accountId];
       return next;
     });
-    setFilter((f) => (f === accountId ? 'all' : f));
-  }, []);
+  }, [accounts]);
 
   const discardSavedAccount = useCallback((savedId: string) => {
     removeSavedAccount(savedId);
+    removePortfolioCacheBySavedId(savedId);
     setRestoreFailures((prev) => prev.filter((row) => row.id !== savedId));
   }, []);
 
@@ -473,6 +673,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const value = useMemo<WalletContextValue>(
     () => ({
       ready,
+      isRefreshing,
+      lastUpdatedAt,
       accounts,
       filter,
       setFilter,
@@ -503,6 +705,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready,
+      isRefreshing,
+      lastUpdatedAt,
       accounts,
       filter,
       selectedAccounts,

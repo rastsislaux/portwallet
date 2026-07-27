@@ -18,6 +18,7 @@ export function CardsScreen() {
     fundingByAccountId,
     cardWarnings,
     refresh,
+    isRefreshing,
   } = useWallet();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
@@ -80,13 +81,26 @@ export function CardsScreen() {
 
   return (
     <section className="screen screen--cards">
-      <header className="header-block">
-        <h1 className="screen-title">Cards</h1>
-        <p className="custody-strip">
-          {cards.length === 0
-            ? 'No cards on connected accounts'
-            : `${cards.length} card${cards.length === 1 ? '' : 's'} across providers`}
-        </p>
+      <header className="header-block header-block--row">
+        <div>
+          <h1 className="screen-title">Cards</h1>
+          <p className="custody-strip">
+            {cards.length === 0
+              ? 'No cards on connected accounts'
+              : `${cards.length} card${cards.length === 1 ? '' : 's'} across providers`}
+            {isRefreshing ? ' · Updating…' : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn--text"
+          disabled={isRefreshing}
+          onClick={() => {
+            void refresh();
+          }}
+        >
+          {isRefreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
       </header>
 
       {cardWarnings.length > 0 ? (

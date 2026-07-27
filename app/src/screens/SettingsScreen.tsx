@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconAccounts, IconBack, IconChevronDown } from '../components/icons';
 import { useSettings } from '../state/SettingsContext';
+import { useWallet } from '../state/WalletContext';
 
 export function SettingsScreen() {
   const {
@@ -20,6 +21,7 @@ export function SettingsScreen() {
     setHideBelowThresholdAmount,
     setHideBelowThresholdCurrency,
   } = useSettings();
+  const { refresh, isRefreshing, lastUpdatedAt, accounts } = useWallet();
 
   const selected = currencies.find((c) => c.code === mainCurrency);
   const [amountText, setAmountText] = useState(() => String(hideBelowThresholdAmount));
@@ -181,6 +183,38 @@ export function SettingsScreen() {
             </span>
           </Link>
         </div>
+      </div>
+
+      <div className="section-block">
+        <div className="section-label">Data</div>
+        <div className="grouped-list">
+          <div className="grouped-row grouped-row--field">
+            <div className="grouped-row__body">
+              <div className="grouped-row__title">Portfolio cache</div>
+              <div className="grouped-row__meta">
+                {accounts.length === 0
+                  ? 'Connect an account to load balances, cards, and activity'
+                  : lastUpdatedAt
+                    ? `Last updated ${new Date(lastUpdatedAt).toLocaleString()}`
+                    : 'Showing live provider data'}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn--text"
+              disabled={isRefreshing || accounts.length === 0}
+              onClick={() => {
+                void Promise.all([refresh(), refreshRate()]);
+              }}
+            >
+              {isRefreshing || rateStatus === 'loading' ? 'Refreshing…' : 'Refresh now'}
+            </button>
+          </div>
+        </div>
+        <p className="settings-rate-meta">
+          Portfolio data is kept in this browser so the app can open instantly, then
+          updates in the background every couple of minutes.
+        </p>
       </div>
 
       <div className="section-block">

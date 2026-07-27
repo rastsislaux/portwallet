@@ -2,12 +2,40 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
 import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
-import { CryptoIcon, IconExchange, IconReceive, IconSend, IconSettings } from '../components/icons';
+import {
+  CryptoIcon,
+  IconExchange,
+  IconReceive,
+  IconRefresh,
+  IconSend,
+  IconSettings,
+} from '../components/icons';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
+function formatUpdatedAt(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function HomeScreen() {
-  const { ready, assets, totalFiatUsd, custodySummary, accounts } = useWallet();
+  const {
+    ready,
+    assets,
+    totalFiatUsd,
+    custodySummary,
+    accounts,
+    refresh,
+    isRefreshing,
+    lastUpdatedAt,
+  } = useWallet();
   const {
     displayCurrency,
     formatFromUsd,
@@ -29,6 +57,7 @@ export function HomeScreen() {
     ? formatQty(totalFiatUsd / (btc.fiatValueUsd / btc.quantity || 68420), 4)
     : formatQty(totalFiatUsd / 68420, 4);
   const balance = formatFromUsdParts(totalFiatUsd);
+  const updatedLabel = formatUpdatedAt(lastUpdatedAt);
 
   if (!ready) {
     return (
@@ -48,6 +77,22 @@ export function HomeScreen() {
           <div className="brand-mark">Portwallet</div>
           <div className="brand-header__actions">
             <AccountFilter />
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={isRefreshing ? 'Refreshing portfolio' : 'Refresh portfolio'}
+              title={isRefreshing ? 'Refreshing…' : 'Refresh'}
+              disabled={isRefreshing || accounts.length === 0}
+              onClick={() => {
+                void refresh();
+              }}
+            >
+              <IconRefresh
+                size={20}
+                strokeWidth={1.75}
+                className={isRefreshing ? 'icon-spin' : undefined}
+              />
+            </button>
             <Link
               to="/settings"
               className="icon-button"
@@ -58,7 +103,12 @@ export function HomeScreen() {
             </Link>
           </div>
         </div>
-        <p className="custody-strip">{custodySummary}</p>
+        <p className="custody-strip">
+          {custodySummary}
+          {accounts.length > 0 && updatedLabel
+            ? ` · ${isRefreshing ? 'Updating…' : `Updated ${updatedLabel}`}`
+            : null}
+        </p>
       </header>
 
       {accounts.length === 0 ? (
