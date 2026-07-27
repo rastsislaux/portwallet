@@ -21,6 +21,7 @@ const STORAGE_MAIN_CURRENCY = 'portwallet.mainCurrency';
 const STORAGE_HIDE_BELOW_ENABLED = 'portwallet.hideBelowThreshold.enabled';
 const STORAGE_HIDE_BELOW_AMOUNT = 'portwallet.hideBelowThreshold.amount';
 const STORAGE_HIDE_BELOW_CURRENCY = 'portwallet.hideBelowThreshold.currency';
+const STORAGE_SHOW_24H_CHANGE = 'portwallet.show24hChange.enabled';
 
 const DEFAULT_HIDE_BELOW_AMOUNT = 1;
 
@@ -51,6 +52,9 @@ type SettingsContextValue = {
   setHideBelowThresholdCurrency: (code: string) => void;
   /** USD value to compare against; null when filtering is inactive. */
   hideBelowThresholdUsd: number | null;
+  /** Show 24h mark-to-market portfolio change under the home total. */
+  show24hChangeEnabled: boolean;
+  setShow24hChangeEnabled: (enabled: boolean) => void;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -150,6 +154,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [hideBelowThresholdCurrency, setHideBelowCurrencyState] = useState(() =>
     readStoredCurrency(STORAGE_HIDE_BELOW_CURRENCY, readStoredCurrency(STORAGE_MAIN_CURRENCY, DEFAULT_MAIN_CURRENCY)),
   );
+  const [show24hChangeEnabled, setShow24hChangeState] = useState(() =>
+    readStoredBool(STORAGE_SHOW_24H_CHANGE, true),
+  );
   const [thresholdRateQuote, setThresholdRateQuote] = useState<FxQuote | null>(null);
 
   const setMainCurrency = useCallback((code: string) => {
@@ -175,6 +182,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (!getCurrency(next)) return;
     setHideBelowCurrencyState(next);
     writeStorage(STORAGE_HIDE_BELOW_CURRENCY, next);
+  }, []);
+
+  const setShow24hChangeEnabled = useCallback((enabled: boolean) => {
+    setShow24hChangeState(enabled);
+    writeStorage(STORAGE_SHOW_24H_CHANGE, String(enabled));
   }, []);
 
   const refreshRate = useCallback(async () => {
@@ -288,6 +300,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setHideBelowThresholdAmount,
       setHideBelowThresholdCurrency,
       hideBelowThresholdUsd,
+      show24hChangeEnabled,
+      setShow24hChangeEnabled,
     }),
     [
       mainCurrency,
@@ -308,6 +322,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setHideBelowThresholdAmount,
       setHideBelowThresholdCurrency,
       hideBelowThresholdUsd,
+      show24hChangeEnabled,
+      setShow24hChangeEnabled,
     ],
   );
 

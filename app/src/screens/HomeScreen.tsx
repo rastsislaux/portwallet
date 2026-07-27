@@ -11,6 +11,7 @@ import {
   IconSettings,
 } from '../components/icons';
 import { PwaInstallBanner } from '../components/PwaInstallBanner';
+import { usePortfolioDayChange } from '../hooks/usePortfolioDayChange';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -24,6 +25,23 @@ function formatUpdatedAt(iso: string | null): string | null {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatSignedFiat(value: number): string {
+  const abs = formatFiat(Math.abs(value));
+  if (value > 0) return `+${abs}`;
+  if (value < 0) return `−${abs}`;
+  return abs;
+}
+
+function formatSignedPct(value: number): string {
+  const abs = Math.abs(value).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (value > 0) return `+${abs}%`;
+  if (value < 0) return `−${abs}%`;
+  return `${abs}%`;
 }
 
 export function HomeScreen() {
@@ -41,9 +59,11 @@ export function HomeScreen() {
     displayCurrency,
     formatFromUsd,
     formatFromUsdParts,
+    convertFromUsd,
     hideBelowThresholdUsd,
     hideBelowThresholdAmount,
     hideBelowThresholdCurrency,
+    show24hChangeEnabled,
   } = useSettings();
 
   const visibleAssets = useMemo(() => {
@@ -53,12 +73,27 @@ export function HomeScreen() {
 
   const hiddenCount = assets.length - visibleAssets.length;
 
+  const dayChange = usePortfolioDayChange(
+    show24hChangeEnabled && accounts.length > 0,
+    assets,
+    lastUpdatedAt,
+  );
+
   const btc = assets.find((a) => a.symbol === 'BTC');
   const btcApprox = btc
     ? formatQty(totalFiatUsd / (btc.fiatValueUsd / btc.quantity || 68420), 4)
     : formatQty(totalFiatUsd / 68420, 4);
   const balance = formatFromUsdParts(totalFiatUsd);
   const updatedLabel = formatUpdatedAt(lastUpdatedAt);
+
+  const changeTone =
+    dayChange.change == null
+      ? 'flat'
+      : dayChange.change.changeUsd > 0
+        ? 'up'
+        : dayChange.change.changeUsd < 0
+          ? 'down'
+          : 'flat';
 
   if (!ready) {
     return (
@@ -133,6 +168,27 @@ export function HomeScreen() {
               <span className="portfolio-total__dec">.{balance.decimal}</span>
               <span className="portfolio-total__currency">{displayCurrency}</span>
             </div>
+            {show24hChangeEnabled && dayChange.status === 'ready' && dayChange.change ? (
+              <div
+                className={`portfolio-total__change portfolio-total__change--${changeTone} tabular`}
+                aria-label={`24 hour change ${formatSignedFiat(convertFromUsd(dayChange.change.changeUsd))} ${displayCurrency}${
+                  dayChange.change.changePct == null
+                    ? ''
+                    : ` (${formatSignedPct(dayChange.change.changePct)})`
+                }`}
+              >
+                <span>
+                  {formatSignedFiat(convertFromUsd(dayChange.change.changeUsd))}{' '}
+                  {displayCurrency}
+                </span>
+                {dayChange.change.changePct != null ? (
+                  <span className="portfolio-total__change-pct">
+                    ({formatSignedPct(dayChange.change.changePct)})
+                  </span>
+                ) : null}
+                <span className="portfolio-total__change-label">24h</span>
+              </div>
+            ) : null}
             <div className="portfolio-total__meta">≈ {btcApprox} BTC</div>
           </div>
 

@@ -41,6 +41,16 @@ export const FX_DATA_SOURCES = [
   },
 ] as const;
 
+/** Extra non-FX sources shown on the Settings data-sources section. */
+export const MARKET_DATA_SOURCES = [
+  {
+    id: 'bybit-market',
+    title: 'Bybit market',
+    detail:
+      'Public Bybit spot tickers power the optional 24h portfolio change on Home, using the same mark-to-market approach across every connected account.',
+  },
+] as const;
+
 function sourceLabel(source: FxQuote['source']): string {
   if (source === 'nbrb') return 'NBRB';
   if (source === 'frankfurter') return 'Frankfurter';
