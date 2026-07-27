@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconAccounts, IconBack, IconChevronDown, IconDownload } from '../components/icons';
+import { MARKET_DATA_SOURCES } from '../fx/rates';
 import { usePwaInstall } from '../state/PwaInstallContext';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
@@ -24,6 +25,8 @@ export function SettingsScreen() {
     setHideBelowThresholdEnabled,
     setHideBelowThresholdAmount,
     setHideBelowThresholdCurrency,
+    show24hChangeEnabled,
+    setShow24hChangeEnabled,
   } = useSettings();
   const { refresh, isRefreshing, lastUpdatedAt, accounts } = useWallet();
   const {
@@ -121,6 +124,24 @@ export function SettingsScreen() {
                 </optgroup>
               </select>
             </div>
+          </div>
+
+          <div className="grouped-row grouped-row--field">
+            <div className="grouped-row__body">
+              <div className="grouped-row__title">24h portfolio change</div>
+              <div className="grouped-row__meta">
+                Show today's total worth change under the balance
+              </div>
+            </div>
+            <label className="settings-switch">
+              <input
+                type="checkbox"
+                checked={show24hChangeEnabled}
+                onChange={(e) => setShow24hChangeEnabled(e.target.checked)}
+                aria-label="Show 24h portfolio change"
+              />
+              <span className="settings-switch__track" aria-hidden="true" />
+            </label>
           </div>
 
           <div className="grouped-row grouped-row--field">
@@ -311,10 +332,17 @@ export function SettingsScreen() {
               <p className="settings-sources__detail">{source.detail}</p>
             </div>
           ))}
+          {MARKET_DATA_SOURCES.map((source) => (
+            <div key={source.id} className="settings-sources__item">
+              <div className="settings-sources__title">{source.title}</div>
+              <p className="settings-sources__detail">{source.detail}</p>
+            </div>
+          ))}
           <p className="settings-sources__note">
             Fiat display converts from USD portfolio values using the sources above.
             Crypto prices themselves come from connected providers. The secondary
-            total uses the same FX sources for fiat, or provider prices for crypto.
+            total uses the same FX sources for fiat, or provider prices for crypto;
+            24h change uses Bybit public market data.
           </p>
         </div>
       </div>

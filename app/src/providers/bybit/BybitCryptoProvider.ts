@@ -370,15 +370,17 @@ export class BybitCryptoProvider implements CryptoProvider {
         if (product === 'FUND') {
           for (const row of deposits.rows ?? []) {
             const statusNum = row.status ?? 0;
+            const assetSymbol = (row.coin ?? '').toUpperCase();
+            const quantity = num(row.amount);
             txs.push({
               id: row.txID || nextId('tx'),
               accountId,
               kind: 'deposit',
               status:
                 statusNum === 3 ? 'completed' : statusNum === 4 ? 'failed' : 'pending',
-              assetSymbol: (row.coin ?? '').toUpperCase(),
-              quantity: num(row.amount),
-              fiatValueUsd: 0,
+              assetSymbol,
+              quantity,
+              fiatValueUsd: STABLECOINS.has(assetSymbol) ? quantity : 0,
               networkName: row.chain,
               createdAt: toIso(row.successAt || row.createTime),
               providerLabel: label,
