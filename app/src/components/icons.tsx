@@ -1,6 +1,5 @@
 import type { ComponentType } from 'react';
 import {
-  Activity,
   ArrowDown,
   ArrowDownUp,
   ArrowLeft,
@@ -9,6 +8,7 @@ import {
   ChevronDown,
   Copy,
   CreditCard,
+  History,
   Home,
   RefreshCw,
   Repeat2,
@@ -32,7 +32,7 @@ function withDefaults(Icon: ComponentType<LucideProps>) {
 }
 
 export const IconHome = withDefaults(Home);
-export const IconActivity = withDefaults(Activity);
+export const IconHistory = withDefaults(History);
 export const IconCards = withDefaults(CreditCard);
 export const IconExchange = withDefaults(Repeat2);
 export const IconAccounts = withDefaults(WalletCards);
