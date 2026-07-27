@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatFiat, formatQty } from '../components/Amount';
+import { CardCarousel } from '../components/CardCarousel';
 import { CryptoIcon } from '../components/icons';
-import { PaymentCard } from '../components/PaymentCard';
 import { StatusBadge } from '../components/StatusBadge';
 import type { CardOperation, ProviderCard } from '../domain/types';
 import { useSettings } from '../state/SettingsContext';
@@ -16,6 +16,8 @@ export function CardsScreen() {
     cardOperations,
     accountCardStatuses,
     fundingByAccountId,
+    cardWarnings,
+    refresh,
   } = useWallet();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
@@ -87,19 +89,34 @@ export function CardsScreen() {
         </p>
       </header>
 
-      {cards.length > 0 ? (
-        <div className="card-rail" role="list" aria-label="Payment cards">
-          {cards.map((card) => (
-            <div key={card.id} className="card-rail__item" role="listitem">
-              <PaymentCard
-                card={card}
-                accountNickname={accountById.get(card.accountId)?.nickname ?? card.label}
-                selected={card.id === selectedCardId}
-                onSelect={() => setSelectedCardId(card.id)}
-              />
-            </div>
-          ))}
+      {cardWarnings.length > 0 ? (
+        <div className="notice notice--warning card-warning" role="status">
+          <div className="card-warning__body">
+            {cardWarnings.map((warning) => (
+              <p key={warning.accountId}>{warning.message}</p>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="btn btn--text"
+            onClick={() => {
+              void refresh();
+            }}
+          >
+            Retry
+          </button>
         </div>
+      ) : null}
+
+      {cards.length > 0 ? (
+        <CardCarousel
+          cards={cards}
+          selectedCardId={selectedCardId}
+          accountNickname={(card) =>
+            accountById.get(card.accountId)?.nickname ?? card.label
+          }
+          onSelect={setSelectedCardId}
+        />
       ) : (
         <div className="empty empty--compact">
           <p>None of your connected accounts have issued cards yet.</p>
@@ -114,6 +131,9 @@ export function CardsScreen() {
           }
           funding={fundingByAccountId[selectedCard.accountId] ?? []}
           operations={selectedOps}
+          activityDegraded={cardWarnings.some(
+            (w) => w.accountId === selectedCard.accountId,
+          )}
         />
       ) : null}
 
@@ -161,11 +181,13 @@ function CardDetail({
   accountNickname,
   funding,
   operations,
+  activityDegraded,
 }: {
   card: ProviderCard;
   accountNickname: string;
   funding: ReturnType<typeof useWallet>['fundingByAccountId'][string];
   operations: CardOperation[];
+  activityDegraded: boolean;
 }) {
   const { formatFromUsd } = useSettings();
   const eligibleFunding = funding.filter((f) => f.cardEligible);
@@ -206,7 +228,11 @@ function CardDetail({
         <div className="section-eyebrow">Recent card activity</div>
         {operations.length === 0 ? (
           <div className="empty empty--compact">
-            <p>No operations on this card yet.</p>
+            <p>
+              {activityDegraded
+                ? 'Card activity could not be refreshed right now.'
+                : 'No operations on this card yet.'}
+            </p>
           </div>
         ) : (
           <div className="tx-list">

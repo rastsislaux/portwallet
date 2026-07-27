@@ -24,7 +24,11 @@ import type {
   WalletProduct,
 } from '../../domain/types';
 import { WALLET_PRODUCT_LABELS } from '../../domain/types';
-import { BybitApiError, BybitRestClient } from './client';
+import {
+  BybitApiError,
+  BybitRestClient,
+  isBybitRateLimitError,
+} from './client';
 import {
   assertCan,
   parseBybitPermissions,
@@ -33,6 +37,32 @@ import {
 
 const BYBIT_CARD_ELIGIBLE = new Set(['USDT', 'USDC']);
 const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'FDUSD', 'USDE']);
+/** Share one query-asset-records response across listCards + getCardOperations. */
+const CARD_RECORDS_CACHE_TTL_MS = 30_000;
+
+type CardAssetRecord = {
+  pan4?: string;
+  side?: string;
+  status?: string;
+  tradeStatus?: string;
+  basicAmount?: string;
+  billAmount?: string;
+  paidAmount?: string;
+  basicCurrency?: string;
+  paidCurrency?: string;
+  transactionCurrencyAmount?: string;
+  merchName?: string;
+  txnId?: string;
+  orderNo?: string;
+  txnCreate?: number | string;
+  declinedReason?: string;
+};
+
+type CardRecordsCache = {
+  fetchedAt: number;
+  records: CardAssetRecord[];
+  inFlight?: Promise<CardAssetRecord[]>;
+};
 
 type Connection = {
   id: string;
@@ -44,6 +74,7 @@ type Connection = {
   bybitServer: BybitServerId;
   priceCache: Map<string, number>;
   priceCachedAt: number;
+  cardRecordsCache?: CardRecordsCache;
 };
 
 type Session = {
@@ -1205,25 +1236,46 @@ export class BybitCryptoProvider implements CryptoProvider {
   private async fetchCardRecords(
     connection: Connection,
     pan4?: string,
-  ): Promise<
-    Array<{
-      pan4?: string;
-      side?: string;
-      status?: string;
-      tradeStatus?: string;
-      basicAmount?: string;
-      billAmount?: string;
-      paidAmount?: string;
-      basicCurrency?: string;
-      paidCurrency?: string;
-      transactionCurrencyAmount?: string;
-      merchName?: string;
-      txnId?: string;
-      orderNo?: string;
-      txnCreate?: number | string;
-      declinedReason?: string;
-    }>
-  > {
+  ): Promise<CardAssetRecord[]> {
+    const records = await this.loadCardRecords(connection);
+    if (pan4 && pan4 !== '····') {
+      return records.filter((row) => row.pan4 === pan4);
+    }
+    return records;
+  }
+
+  private async loadCardRecords(
+    connection: Connection,
+  ): Promise<CardAssetRecord[]> {
+    const cached = connection.cardRecordsCache;
+    const now = Date.now();
+    if (cached?.inFlight) {
+      return cached.inFlight;
+    }
+    if (cached && now - cached.fetchedAt < CARD_RECORDS_CACHE_TTL_MS) {
+      return cached.records;
+    }
+
+    const inFlight = this.requestCardRecords(connection);
+    connection.cardRecordsCache = {
+      fetchedAt: 0,
+      records: cached?.records ?? [],
+      inFlight,
+    };
+
+    try {
+      const records = await inFlight;
+      connection.cardRecordsCache = { fetchedAt: Date.now(), records };
+      return records;
+    } catch (err) {
+      connection.cardRecordsCache = undefined;
+      throw err;
+    }
+  }
+
+  private async requestCardRecords(
+    connection: Connection,
+  ): Promise<CardAssetRecord[]> {
     // Bybit `/v5/card/transaction/query-asset-records` only accepts
     // `SIDE_QUERY_AUTH` for `type` in practice. `SIDE_QUERY_FINANCIAL` and
     // `SIDE_QUERY_REFUND` are rejected as invalid parameters despite appearing
@@ -1237,27 +1289,13 @@ export class BybitCryptoProvider implements CryptoProvider {
         type: 'SIDE_QUERY_AUTH',
         limit: 100,
         page: 1,
-        ...(pan4 && pan4 !== '····' ? { pan4 } : {}),
       });
-      return (result.data ?? []) as Array<{
-        pan4?: string;
-        side?: string;
-        status?: string;
-        tradeStatus?: string;
-        basicAmount?: string;
-        billAmount?: string;
-        paidAmount?: string;
-        basicCurrency?: string;
-        paidCurrency?: string;
-        transactionCurrencyAmount?: string;
-        merchName?: string;
-        txnId?: string;
-        orderNo?: string;
-        txnCreate?: number | string;
-        declinedReason?: string;
-      }>;
-    } catch {
-      /* BitCard endpoints may 403 without card */
+      return (result.data ?? []) as CardAssetRecord[];
+    } catch (err) {
+      // Rate limits are retried in BybitRestClient; if still failing, surface
+      // them so the wallet layer can keep prior data and warn the user.
+      if (isBybitRateLimitError(err)) throw err;
+      /* BitCard endpoints may 403 without card / missing permission */
       return [];
     }
   }

@@ -385,6 +385,21 @@ export class MockCryptoProvider implements CryptoProvider {
           fundingAssetSymbols: symbols,
           expiresLabel: '09/28',
         },
+        {
+          id: nextId('card'),
+          accountId: account.id,
+          providerType: 'bybit',
+          label: 'Bybit Card · Metal',
+          lastFour: '9054',
+          network: 'visa',
+          status: 'active',
+          holderName: account.nickname.replace(/\s+Bybit$/i, '') || 'Cardholder',
+          currency: 'USD',
+          balanceUsd,
+          balanceSource: 'calculated',
+          fundingAssetSymbols: symbols,
+          expiresLabel: '09/28',
+        },
       ];
     }
 

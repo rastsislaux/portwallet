@@ -1611,14 +1611,118 @@ img {
   gap: var(--space-5);
 }
 
-.card-rail {
+.card-warning {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-warning__body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 6px;
+  min-width: 0;
+}
+
+.card-warning__body p {
+  margin: 0;
+}
+
+.card-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-inline: calc(-1 * var(--pad-screen));
+}
+
+.card-rail {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--space-3);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--pad-screen);
+  padding-inline: var(--pad-screen);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card-rail::-webkit-scrollbar {
+  display: none;
 }
 
 .card-rail__item {
-  width: 100%;
+  flex: 0 0 min(100%, 340px);
+  width: min(100%, 340px);
+  max-width: 100%;
+  scroll-snap-align: center;
+}
+
+@media (max-width: 420px) {
+  .card-rail__item {
+    flex-basis: 88%;
+    width: 88%;
+  }
+}
+
+.card-carousel__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-inline: var(--pad-screen);
+}
+
+.card-carousel__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bg-fill);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease),
+    opacity var(--duration-fast) var(--ease);
+}
+
+.card-carousel__nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.card-carousel__nav:not(:disabled):active {
+  background: var(--bg-elevated);
+}
+
+.card-carousel__dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-carousel__dot {
+  width: 7px;
+  height: 7px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: var(--ink-quaternary);
+  cursor: pointer;
+  transition:
+    width var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease);
+}
+
+.card-carousel__dot.is-active {
+  width: 18px;
+  background: var(--ink);
 }
 
 /* ISO/IEC 7810 ID-1 credit card aspect ratio ≈ 85.60 × 53.98 mm */

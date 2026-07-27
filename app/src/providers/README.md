@@ -29,3 +29,5 @@ Optional payment-card surface per account:
 ### Bybit card transaction query quirk
 
 `POST /v5/card/transaction/query-asset-records` only accepts `type: "SIDE_QUERY_AUTH"`. Values such as `SIDE_QUERY_FINANCIAL` and `SIDE_QUERY_REFUND` are rejected as invalid parameters (despite appearing in older samples). Portwallet therefore queries only `SIDE_QUERY_AUTH`.
+
+Responses are cached briefly on the connection so `listCards` and `getCardOperations` share one fetch. The REST client retries `retCode` `10006` (rate limit) using `X-Bapi-Limit-Reset-Timestamp` when present; unrecoverable failures keep prior card data and surface a warning on the Cards screen.
