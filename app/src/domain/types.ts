@@ -178,6 +178,13 @@ export interface ConnectConfig {
   apiKey?: string;
   apiSecret?: string;
   bybitServer?: BybitServerId;
+  /**
+   * Optional separate Bybit Card API key. BitCard cannot be combined with a
+   * typical read-write trading key, so card reads use a read-only key that
+   * only has Bybit Card (BitCard) permission.
+   */
+  cardApiKey?: string;
+  cardApiSecret?: string;
 }
 
 export type CardNetwork = 'visa' | 'mastercard';

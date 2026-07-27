@@ -139,6 +139,13 @@ export function CardsScreen() {
                     {capability.unsupportedReason ??
                       `${account.venueLabel} does not support cards`}
                   </div>
+                  {account.providerType === 'bybit' &&
+                  account.product === 'FUND' &&
+                  !account.permissions?.canCard ? (
+                    <Link className="btn btn--text" to="/accounts">
+                      Add Bybit Card key
+                    </Link>
+                  ) : null}
                 </div>
               </div>
             ))}

@@ -89,7 +89,7 @@ export function assertCan(
       if (!permissions.canCard) {
         throw new PermissionDeniedError(
           'access Bybit Card',
-          'Bybit Card requires BitCard permission on the API key.',
+          'Bybit Card requires a separate read-only API key with only BitCard permission.',
         );
       }
       break;

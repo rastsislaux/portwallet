@@ -5,9 +5,11 @@ import {
   createSavedAccountId,
   readSavedAccounts,
   removeSavedAccount,
+  updateSavedAccount,
   writeSavedAccounts,
   type SavedAccountCredentials,
 } from './accountStorage';
+import { getBybitApiManagementUrl } from '../providers/bybit/servers';
 
 afterEach(() => {
   localStorage.removeItem(STORAGE_SAVED_ACCOUNTS);
@@ -34,6 +36,36 @@ describe('accountStorage', () => {
     const account = sample();
     addSavedAccount(account);
     expect(readSavedAccounts()).toEqual([account]);
+  });
+
+  it('round-trips optional Bybit Card credentials', () => {
+    const account = sample({
+      cardApiKey: 'card-key',
+      cardApiSecret: 'card-secret',
+    });
+    addSavedAccount(account);
+    expect(readSavedAccounts()).toEqual([account]);
+  });
+
+  it('drops incomplete card credential pairs', () => {
+    writeSavedAccounts([
+      sample({ id: 'half', cardApiKey: 'only-key' }),
+      sample({ id: 'ok', cardApiKey: 'k', cardApiSecret: 's' }),
+    ]);
+    expect(readSavedAccounts()).toEqual([
+      sample({ id: 'half' }),
+      sample({ id: 'ok', cardApiKey: 'k', cardApiSecret: 's' }),
+    ]);
+  });
+
+  it('updates card credentials on an existing saved account', () => {
+    addSavedAccount(sample());
+    const updated = updateSavedAccount('saved-1', {
+      cardApiKey: 'card-key',
+      cardApiSecret: 'card-secret',
+    });
+    expect(updated?.cardApiKey).toBe('card-key');
+    expect(readSavedAccounts()[0].cardApiSecret).toBe('card-secret');
   });
 
   it('replaces an existing entry with the same id', () => {
@@ -79,5 +111,22 @@ describe('accountStorage', () => {
     expect(a).toBeTruthy();
     expect(b).toBeTruthy();
     expect(a).not.toBe(b);
+  });
+});
+
+describe('getBybitApiManagementUrl', () => {
+  it('points mainnet and testnet at the API Management pages', () => {
+    expect(getBybitApiManagementUrl('mainnet')).toBe(
+      'https://www.bybit.com/app/user/api-management',
+    );
+    expect(getBybitApiManagementUrl('testnet')).toBe(
+      'https://testnet.bybit.com/app/user/api-management',
+    );
+  });
+
+  it('uses regional website hosts', () => {
+    expect(getBybitApiManagementUrl('mainnet_eu')).toBe(
+      'https://www.bybit.eu/app/user/api-management',
+    );
   });
 });
