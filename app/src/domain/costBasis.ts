@@ -68,14 +68,17 @@ export function averagePurchasePrice(
 ): AveragePurchase | null {
   let totalCostUsd = 0;
   let acquiredQuantity = 0;
+  const seenIds = new Set<string>();
 
   const chronological = [...transactions].sort(
     (a, b) => +new Date(a.createdAt) - +new Date(b.createdAt),
   );
 
   for (const tx of chronological) {
+    if (seenIds.has(tx.id)) continue;
     const lot = acquisitionCostUsd(tx, symbol);
     if (!lot) continue;
+    seenIds.add(tx.id);
     totalCostUsd += lot.costUsd;
     acquiredQuantity += lot.quantity;
   }

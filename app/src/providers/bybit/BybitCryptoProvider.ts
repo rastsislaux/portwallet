@@ -34,11 +34,16 @@ import {
   parseBybitPermissions,
   type BybitApiKeyInfo,
 } from './permissions';
+import {
+  spotExecutionToTransaction,
+  type SpotExecutionRow,
+} from './spotExecutions';
 
 const BYBIT_CARD_ELIGIBLE = new Set(['USDT', 'USDC']);
 const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'FDUSD', 'USDE']);
 /** Share one query-asset-records response across listCards + getCardOperations. */
 const CARD_RECORDS_CACHE_TTL_MS = 30_000;
+const SPOT_EXEC_CACHE_TTL_MS = 30_000;
 
 type CardAssetRecord = {
   pan4?: string;
@@ -64,6 +69,12 @@ type CardRecordsCache = {
   inFlight?: Promise<CardAssetRecord[]>;
 };
 
+type SpotExecCache = {
+  fetchedAt: number;
+  rows: SpotExecutionRow[];
+  inFlight?: Promise<SpotExecutionRow[]>;
+};
+
 type Connection = {
   id: string;
   client: BybitRestClient;
@@ -75,6 +86,7 @@ type Connection = {
   priceCache: Map<string, number>;
   priceCachedAt: number;
   cardRecordsCache?: CardRecordsCache;
+  spotExecCache?: SpotExecCache;
 };
 
 type Session = {
@@ -387,6 +399,7 @@ export class BybitCryptoProvider implements CryptoProvider {
               product: 'FUND',
             });
           }
+          await this.enrichDepositFiatValues(connection, txs);
         }
       } catch {
         /* optional */
@@ -546,6 +559,18 @@ export class BybitCryptoProvider implements CryptoProvider {
         }
       } catch {
         /* optional */
+      }
+    }
+
+    if (product === 'UNIFIED') {
+      try {
+        const rows = await this.loadSpotExecutions(connection);
+        for (const row of rows) {
+          const tx = spotExecutionToTransaction(row, accountId, label, product);
+          if (tx) txs.push(tx);
+        }
+      } catch {
+        /* optional — trading history may be permission-gated */
       }
     }
 
@@ -1271,6 +1296,100 @@ export class BybitCryptoProvider implements CryptoProvider {
       return records.filter((row) => row.pan4 === pan4);
     }
     return records;
+  }
+
+  private async loadSpotExecutions(
+    connection: Connection,
+  ): Promise<SpotExecutionRow[]> {
+    const cached = connection.spotExecCache;
+    const now = Date.now();
+    if (cached?.inFlight) {
+      return cached.inFlight;
+    }
+    if (cached && now - cached.fetchedAt < SPOT_EXEC_CACHE_TTL_MS) {
+      return cached.rows;
+    }
+
+    const inFlight = this.requestSpotExecutions(connection);
+    connection.spotExecCache = {
+      fetchedAt: 0,
+      rows: cached?.rows ?? [],
+      inFlight,
+    };
+
+    try {
+      const rows = await inFlight;
+      connection.spotExecCache = { fetchedAt: Date.now(), rows };
+      return rows;
+    } catch (err) {
+      connection.spotExecCache = cached
+        ? { fetchedAt: cached.fetchedAt, rows: cached.rows }
+        : undefined;
+      throw err;
+    }
+  }
+
+  private async requestSpotExecutions(
+    connection: Connection,
+  ): Promise<SpotExecutionRow[]> {
+    const result = await connection.client.get<{
+      list?: SpotExecutionRow[];
+    }>('/v5/execution/list', {
+      category: 'spot',
+      limit: 100,
+    });
+    return result.list ?? [];
+  }
+
+  /** Fill missing deposit USD costs from hourly candles near the deposit time. */
+  private async enrichDepositFiatValues(
+    connection: Connection,
+    txs: Transaction[],
+  ): Promise<void> {
+    const histCache = new Map<string, number>();
+
+    for (const tx of txs) {
+      if (tx.kind !== 'deposit' || tx.status !== 'completed') continue;
+      if (tx.fiatValueUsd > 0 || !(tx.quantity > 0)) continue;
+      if (STABLECOINS.has(tx.assetSymbol)) {
+        tx.fiatValueUsd = tx.quantity;
+        continue;
+      }
+
+      const atMs = Date.parse(tx.createdAt);
+      if (!Number.isFinite(atMs)) continue;
+      const bucket = Math.floor(atMs / 3_600_000);
+      const cacheKey = `${tx.assetSymbol}:${bucket}`;
+      let px = histCache.get(cacheKey);
+      if (px == null) {
+        px = await this.historicalUsdPrice(connection, tx.assetSymbol, atMs);
+        histCache.set(cacheKey, px);
+      }
+      if (px > 0) tx.fiatValueUsd = tx.quantity * px;
+    }
+  }
+
+  private async historicalUsdPrice(
+    connection: Connection,
+    symbol: string,
+    atMs: number,
+  ): Promise<number> {
+    try {
+      const result = await connection.client.get<{
+        list?: Array<Array<string | number>>;
+      }>('/v5/market/kline', {
+        category: 'spot',
+        symbol: `${symbol}USDT`,
+        interval: '60',
+        start: Math.max(0, atMs - 3_600_000),
+        end: atMs + 3_600_000,
+        limit: 1,
+      });
+      const close = num(result.list?.[0]?.[4]);
+      return close > 0 ? close : 0;
+    } catch {
+      return 0;
+    }
   }
 
   private async loadCardRecords(
