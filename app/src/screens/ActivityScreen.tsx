@@ -22,7 +22,7 @@ export function ActivityScreen() {
   return (
     <section className="screen">
       <header className="header-block">
-        <h1 className="screen-title">Activity</h1>
+        <h1 className="screen-title">History</h1>
       </header>
 
       <div className="segmented" role="tablist" aria-label="Status filter">

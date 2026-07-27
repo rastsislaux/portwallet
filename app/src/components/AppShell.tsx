@@ -1,14 +1,14 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  IconActivity,
   IconCards,
   IconExchange,
+  IconHistory,
   IconHome,
 } from './icons';
 
 const tabs = [
   { to: '/', label: 'Home', end: true, icon: IconHome },
-  { to: '/activity', label: 'Activity', end: false, icon: IconActivity },
+  { to: '/activity', label: 'History', end: false, icon: IconHistory },
   { to: '/cards', label: 'Cards', end: false, icon: IconCards },
   { to: '/exchange', label: 'Exchange', end: false, icon: IconExchange },
 ] as const;

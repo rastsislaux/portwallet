@@ -197,7 +197,7 @@ export function ExchangeScreen() {
             {result.message}
           </div>
           <Link className="btn btn--primary" to="/activity">
-            View activity
+            View history
           </Link>
           <button
             type="button"
