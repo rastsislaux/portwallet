@@ -26,6 +26,7 @@ import type {
   Transaction,
   WalletAccount,
 } from '../domain/types';
+import { withPurchasePnl } from '../domain/costBasis';
 import { ProviderRegistry } from '../providers/registry';
 import {
   addSavedAccount,
@@ -494,7 +495,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, [ready, refresh]);
 
-  const assets = useMemo(() => aggregate(balances), [balances]);
+  const assets = useMemo(
+    () => withPurchasePnl(aggregate(balances), transactions),
+    [balances, transactions],
+  );
   const totalFiatUsd = useMemo(
     () => assets.reduce((sum, a) => sum + a.fiatValueUsd, 0),
     [assets],

@@ -31,6 +31,22 @@ const NETWORKS: NetworkInfo[] = [
 
 /** Stablecoins Bybit allows for card spend from the funding account. */
 const BYBIT_CARD_ELIGIBLE = new Set(['USDT', 'USDC']);
+const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'FDUSD', 'USDE', 'BUSD']);
+
+const SPOT_USD: Record<string, number> = {
+  BTC: 68420,
+  ETH: 2704,
+  SOL: 148,
+  LINK: 14.2,
+  SUI: 1.85,
+};
+
+function usdNotional(symbol: string, quantity: number): number {
+  if (!(quantity > 0)) return 0;
+  if (STABLECOINS.has(symbol.toUpperCase())) return quantity;
+  const px = SPOT_USD[symbol.toUpperCase()];
+  return px ? quantity * px : 0;
+}
 
 type InstanceSeed = {
   balances: Omit<AssetBalance, 'accountId'>[];
@@ -69,10 +85,30 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
           kind: 'deposit',
           status: 'completed',
           assetSymbol: 'BTC',
-          quantity: 0.02,
-          fiatValueUsd: 1368.4,
+          quantity: 0.01,
+          fiatValueUsd: 500,
+          networkName: 'Bitcoin',
+          createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+        },
+        {
+          id: nextId('tx'),
+          kind: 'deposit',
+          status: 'completed',
+          assetSymbol: 'BTC',
+          quantity: 0.01,
+          fiatValueUsd: 600,
           networkName: 'Bitcoin',
           createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+        },
+        {
+          id: nextId('tx'),
+          kind: 'deposit',
+          status: 'completed',
+          assetSymbol: 'ETH',
+          quantity: 0.35,
+          fiatValueUsd: 700,
+          networkName: 'Ethereum',
+          createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
         },
       ],
       funding: [],
@@ -125,7 +161,7 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
         status: 'pending',
         assetSymbol: 'BTC',
         quantity: 0.01,
-        fiatValueUsd: 684.2,
+        fiatValueUsd: usdNotional('BTC', 0.01),
         counterAssetSymbol: 'USDT',
         counterQuantity: 682.15,
         createdAt: new Date(Date.now() - 120000).toISOString(),
@@ -136,7 +172,7 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
         status: 'failed',
         assetSymbol: 'ETH',
         quantity: 0.05,
-        fiatValueUsd: 135.2,
+        fiatValueUsd: usdNotional('ETH', 0.05),
         networkName: 'Ethereum',
         failureReason: 'Insufficient fee balance',
         createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
@@ -152,12 +188,45 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
       },
       {
         id: nextId('tx'),
+        kind: 'exchange',
+        status: 'completed',
+        assetSymbol: 'USDT',
+        quantity: 2500 * skew,
+        fiatValueUsd: 2500 * skew,
+        counterAssetSymbol: 'BTC',
+        counterQuantity: 0.05 * skew,
+        createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
+      },
+      {
+        id: nextId('tx'),
+        kind: 'exchange',
+        status: 'completed',
+        assetSymbol: 'USDT',
+        quantity: 3000 * skew,
+        fiatValueUsd: 3000 * skew,
+        counterAssetSymbol: 'BTC',
+        counterQuantity: 0.05 * skew,
+        createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+      },
+      {
+        id: nextId('tx'),
+        kind: 'exchange',
+        status: 'completed',
+        assetSymbol: 'USDT',
+        quantity: 2000 * skew,
+        fiatValueUsd: 2000 * skew,
+        counterAssetSymbol: 'ETH',
+        counterQuantity: 1.1 * skew,
+        createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+      },
+      {
+        id: nextId('tx'),
         kind: 'deposit',
         status: 'completed',
-        assetSymbol: 'BTC',
-        quantity: 0.02,
-        fiatValueUsd: 1368.4,
-        networkName: 'Bitcoin',
+        assetSymbol: 'USDT',
+        quantity: usdtQty,
+        fiatValueUsd: usdtQty,
+        networkName: 'Tron (TRC20)',
         createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
       },
     ],
@@ -654,7 +723,7 @@ export class MockCryptoProvider implements CryptoProvider {
       status: 'completed',
       assetSymbol: quote.request.fromSymbol,
       quantity: quote.request.fromQuantity,
-      fiatValueUsd: quote.request.fromQuantity * 68420,
+      fiatValueUsd: usdNotional(quote.request.fromSymbol, quote.request.fromQuantity),
       counterAssetSymbol: quote.request.toSymbol,
       counterQuantity: quote.youReceiveQuantity,
       createdAt: new Date().toISOString(),

@@ -75,6 +75,14 @@ export interface AggregatedAsset {
   quantity: number;
   fiatValueUsd: number;
   accountIds: string[];
+  /** Weighted average USD paid per unit, from provider buy history. */
+  averageBuyPriceUsd?: number | null;
+  /** averageBuyPriceUsd × current quantity. */
+  costBasisUsd?: number | null;
+  /** Current market value minus cost basis. */
+  unrealizedPnlUsd?: number | null;
+  /** Percent change vs average buy price. */
+  unrealizedPnlPct?: number | null;
 }
 
 export interface NetworkInfo {

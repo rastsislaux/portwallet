@@ -493,8 +493,29 @@ export class BybitCryptoProvider implements CryptoProvider {
           }>;
         }>('/v5/asset/exchange/query-convert-history', { limit: 50 });
 
-        for (const row of converts.list ?? []) {
+        const convertRows = (converts.list ?? []).filter((row) => {
+          const accountType = (row.accountType ?? '').toUpperCase();
+          if (!accountType) return product === 'FUND';
+          return accountType === product;
+        });
+
+        const needsPrice = [
+          ...new Set(
+            convertRows
+              .map((row) => (row.fromCoin ?? '').toUpperCase())
+              .filter((coin) => coin && !STABLECOINS.has(coin)),
+          ),
+        ];
+        if (needsPrice.length > 0) {
+          await this.refreshPrices(connection, needsPrice);
+        }
+
+        for (const row of convertRows) {
           const st = (row.exchangeStatus ?? '').toLowerCase();
+          const fromCoin = (row.fromCoin ?? '').toUpperCase();
+          const toCoin = (row.toCoin ?? '').toUpperCase();
+          const fromAmount = num(row.fromAmount);
+          const toAmount = num(row.toAmount);
           txs.push({
             id: `${row.exchangeTxId || nextId('tx')}_${product}`,
             accountId,
@@ -505,11 +526,17 @@ export class BybitCryptoProvider implements CryptoProvider {
                 : st.includes('fail')
                   ? 'failed'
                   : 'pending',
-            assetSymbol: (row.fromCoin ?? '').toUpperCase(),
-            quantity: num(row.fromAmount),
-            fiatValueUsd: 0,
-            counterAssetSymbol: (row.toCoin ?? '').toUpperCase(),
-            counterQuantity: num(row.toAmount),
+            assetSymbol: fromCoin,
+            quantity: fromAmount,
+            fiatValueUsd: estimateConvertFiatUsd(
+              fromCoin,
+              toCoin,
+              fromAmount,
+              toAmount,
+              connection.priceCache,
+            ),
+            counterAssetSymbol: toCoin,
+            counterQuantity: toAmount,
             createdAt: toIso(row.createdAt),
             providerLabel: label,
             product,
@@ -1316,6 +1343,23 @@ function toIso(value: string | number | undefined): string {
   }
   const d = new Date(value);
   return Number.isNaN(+d) ? new Date().toISOString() : d.toISOString();
+}
+
+/** Best-effort USD notional for a convert, used as acquisition cost. */
+function estimateConvertFiatUsd(
+  fromCoin: string,
+  toCoin: string,
+  fromAmount: number,
+  toAmount: number,
+  priceCache: Map<string, number>,
+): number {
+  if (STABLECOINS.has(fromCoin) && fromAmount > 0) return fromAmount;
+  if (STABLECOINS.has(toCoin) && toAmount > 0) return toAmount;
+  const fromPx = priceCache.get(fromCoin) ?? 0;
+  if (fromPx > 0 && fromAmount > 0) return fromAmount * fromPx;
+  const toPx = priceCache.get(toCoin) ?? 0;
+  if (toPx > 0 && toAmount > 0) return toAmount * toPx;
+  return 0;
 }
 
 export function createBybitProvider(): BybitCryptoProvider {
