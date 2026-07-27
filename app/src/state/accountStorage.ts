@@ -9,6 +9,9 @@ export type SavedAccountCredentials = {
   apiKey?: string;
   apiSecret?: string;
   bybitServer?: BybitServerId;
+  /** Separate read-only Bybit Card (BitCard) API key. */
+  cardApiKey?: string;
+  cardApiSecret?: string;
 };
 
 function isProviderType(value: unknown): value is ProviderType {
@@ -51,9 +54,21 @@ function parseSavedAccount(value: unknown): SavedAccountCredentials | null {
     saved.apiSecret = row.apiSecret;
   }
   if (isBybitServerId(row.bybitServer)) saved.bybitServer = row.bybitServer;
+  if (typeof row.cardApiKey === 'string' && row.cardApiKey) {
+    saved.cardApiKey = row.cardApiKey;
+  }
+  if (typeof row.cardApiSecret === 'string' && row.cardApiSecret) {
+    saved.cardApiSecret = row.cardApiSecret;
+  }
 
   if (saved.providerType === 'bybit' && (!saved.apiKey || !saved.apiSecret)) {
     return null;
+  }
+
+  // Card credentials are optional, but must be a complete pair when present.
+  if (Boolean(saved.cardApiKey) !== Boolean(saved.cardApiSecret)) {
+    delete saved.cardApiKey;
+    delete saved.cardApiSecret;
   }
 
   return saved;
@@ -89,6 +104,23 @@ export function addSavedAccount(account: SavedAccountCredentials): void {
 
 export function removeSavedAccount(id: string): void {
   writeSavedAccounts(readSavedAccounts().filter((row) => row.id !== id));
+}
+
+export function updateSavedAccount(
+  id: string,
+  patch: Partial<Omit<SavedAccountCredentials, 'id' | 'providerType'>>,
+): SavedAccountCredentials | null {
+  const accounts = readSavedAccounts();
+  const index = accounts.findIndex((row) => row.id === id);
+  if (index < 0) return null;
+  const next = { ...accounts[index], ...patch };
+  if (Boolean(next.cardApiKey) !== Boolean(next.cardApiSecret)) {
+    delete next.cardApiKey;
+    delete next.cardApiSecret;
+  }
+  accounts[index] = next;
+  writeSavedAccounts(accounts);
+  return next;
 }
 
 export function createSavedAccountId(): string {

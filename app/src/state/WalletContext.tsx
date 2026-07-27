@@ -32,8 +32,10 @@ import {
   createSavedAccountId,
   readSavedAccounts,
   removeSavedAccount,
+  updateSavedAccount,
   type SavedAccountCredentials,
 } from './accountStorage';
+import { BybitCryptoProvider } from '../providers/bybit/BybitCryptoProvider';
 
 export type AccountFilter = 'all' | string;
 
@@ -72,6 +74,11 @@ type WalletContextValue = {
     type: ProviderType,
     config: ConnectConfig,
   ) => Promise<WalletAccount[]>;
+  attachBybitCardKey: (
+    providerInstanceId: string,
+    cardApiKey: string,
+    cardApiSecret: string,
+  ) => Promise<void>;
   removeAccount: (accountId: string) => Promise<void>;
   prepareSend: (request: SendRequest) => Promise<SendPreview>;
   submitSend: (accountId: string, previewId: string) => Promise<OperationResult>;
@@ -221,6 +228,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             apiKey: entry.apiKey,
             apiSecret: entry.apiSecret,
             bybitServer: entry.bybitServer,
+            cardApiKey: entry.cardApiKey,
+            cardApiSecret: entry.cardApiSecret,
           });
           for (const account of connected) {
             registry.bindAccount(account.id, provider);
@@ -275,6 +284,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         apiKey: config.apiKey?.trim() || undefined,
         apiSecret: config.apiSecret?.trim() || undefined,
         bybitServer: config.bybitServer,
+        cardApiKey: config.cardApiKey?.trim() || undefined,
+        cardApiSecret: config.cardApiSecret?.trim() || undefined,
       };
       addSavedAccount(saved);
       if (connected[0]) {
@@ -285,6 +296,48 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       return connected;
     },
     [],
+  );
+
+  const attachBybitCardKey = useCallback(
+    async (
+      providerInstanceId: string,
+      cardApiKey: string,
+      cardApiSecret: string,
+    ) => {
+      const sample = accounts.find(
+        (a) => a.providerInstanceId === providerInstanceId,
+      );
+      if (!sample) {
+        throw new Error('Account not found.');
+      }
+      const provider = registry.getForAccount(sample.id);
+      if (!(provider instanceof BybitCryptoProvider)) {
+        throw new Error('Bybit Card keys are only supported for Bybit accounts.');
+      }
+
+      const updated = await provider.attachCardCredentials(
+        providerInstanceId,
+        cardApiKey,
+        cardApiSecret,
+      );
+
+      const savedId = instanceToSavedId.current.get(providerInstanceId);
+      if (savedId) {
+        updateSavedAccount(savedId, {
+          cardApiKey: cardApiKey.trim(),
+          cardApiSecret: cardApiSecret.trim(),
+        });
+      }
+
+      setAccounts((prev) =>
+        prev.map((account) => {
+          const next = updated.find((row) => row.id === account.id);
+          return next ?? account;
+        }),
+      );
+      await refresh();
+    },
+    [accounts, refresh],
   );
 
   const removeAccount = useCallback(async (accountId: string) => {
@@ -386,6 +439,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       discardSavedAccount,
       refresh,
       addAccount,
+      attachBybitCardKey,
       removeAccount,
       prepareSend,
       submitSend,
@@ -413,6 +467,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       discardSavedAccount,
       refresh,
       addAccount,
+      attachBybitCardKey,
       removeAccount,
       prepareSend,
       submitSend,

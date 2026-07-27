@@ -37,6 +37,8 @@ const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'FDUSD', 'USDE']);
 type Connection = {
   id: string;
   client: BybitRestClient;
+  /** Separate read-only BitCard key when the main key cannot include BitCard. */
+  cardClient?: BybitRestClient;
   permissions: ProviderPermissionSnapshot;
   coinNames: Map<string, string>;
   bybitServer: BybitServerId;
@@ -150,6 +152,14 @@ export class BybitCryptoProvider implements CryptoProvider {
     const client = new BybitRestClient(apiKey, apiSecret, bybitServer);
     const keyInfo = await client.get<BybitApiKeyInfo>('/v5/user/query-api');
     const permissions = parseBybitPermissions(keyInfo);
+    const cardClient = await this.createCardClient(
+      bybitServer,
+      config.cardApiKey,
+      config.cardApiSecret,
+    );
+    if (cardClient) {
+      permissions.canCard = true;
+    }
     const walletTypes = await this.resolveWalletTypes(client, permissions);
 
     const products: WalletProduct[] = [];
@@ -167,6 +177,7 @@ export class BybitCryptoProvider implements CryptoProvider {
     const connection: Connection = {
       id: connectionId,
       client,
+      cardClient,
       permissions,
       coinNames: new Map(),
       bybitServer,
@@ -202,6 +213,47 @@ export class BybitCryptoProvider implements CryptoProvider {
     }
 
     return accounts;
+  }
+
+  /**
+   * Attach or replace the separate Bybit Card (BitCard) API key for an existing
+   * connection. Returns updated accounts that share the connection.
+   */
+  async attachCardCredentials(
+    providerInstanceId: string,
+    cardApiKey: string,
+    cardApiSecret: string,
+  ): Promise<WalletAccount[]> {
+    const connection = this.connections.get(providerInstanceId);
+    if (!connection) {
+      throw new Error('Bybit connection not found. Reconnect the account first.');
+    }
+
+    const cardClient = await this.createCardClient(
+      connection.bybitServer,
+      cardApiKey,
+      cardApiSecret,
+    );
+    if (!cardClient) {
+      throw new Error('Bybit Card API key and secret are required.');
+    }
+
+    connection.cardClient = cardClient;
+    connection.permissions = {
+      ...connection.permissions,
+      canCard: true,
+    };
+
+    const updated: WalletAccount[] = [];
+    for (const session of this.sessions.values()) {
+      if (session.connectionId !== providerInstanceId) continue;
+      session.account = {
+        ...session.account,
+        permissions: connection.permissions,
+      };
+      updated.push(session.account);
+    }
+    return updated;
   }
 
   async disconnect(accountId: string): Promise<void> {
@@ -778,11 +830,11 @@ export class BybitCryptoProvider implements CryptoProvider {
           'Bybit Card spend is tied to the Funding wallet. Open the Funding account.',
       };
     }
-    if (!connection.permissions.canCard) {
+    if (!connection.permissions.canCard && !connection.cardClient) {
       return {
         supported: false,
         unsupportedReason:
-          'This API key does not include BitCard permission, or the account has no Bybit Card access.',
+          'Bybit Card needs a separate read-only API key with only the Bybit Card permission. Add it from Accounts.',
       };
     }
     return { supported: true };
@@ -885,6 +937,35 @@ export class BybitCryptoProvider implements CryptoProvider {
       fiatValueUsd: b.fiatValueUsd,
       cardEligible: BYBIT_CARD_ELIGIBLE.has(b.symbol),
     }));
+  }
+
+  private async createCardClient(
+    bybitServer: BybitServerId,
+    cardApiKey?: string,
+    cardApiSecret?: string,
+  ): Promise<BybitRestClient | undefined> {
+    const key = cardApiKey?.trim();
+    const secret = cardApiSecret?.trim();
+    if (!key && !secret) return undefined;
+    if (!key || !secret) {
+      throw new Error(
+        'Bybit Card API key and secret must both be provided (or both left empty).',
+      );
+    }
+
+    const cardClient = new BybitRestClient(key, secret, bybitServer);
+    const cardKeyInfo = await cardClient.get<BybitApiKeyInfo>('/v5/user/query-api');
+    const cardPermissions = parseBybitPermissions(cardKeyInfo);
+    if (!cardPermissions.canCard) {
+      throw new Error(
+        'The Bybit Card API key must include Bybit Card (BitCard) permission. Create a read-only key with only that permission.',
+      );
+    }
+    return cardClient;
+  }
+
+  private cardApiClient(connection: Connection): BybitRestClient {
+    return connection.cardClient ?? connection.client;
   }
 
   private async resolveWalletTypes(
@@ -1145,10 +1226,11 @@ export class BybitCryptoProvider implements CryptoProvider {
   > {
     const types = ['SIDE_QUERY_FINANCIAL', 'SIDE_QUERY_AUTH', 'SIDE_QUERY_REFUND'];
     const all: Array<Record<string, string | number | undefined>> = [];
+    const client = this.cardApiClient(connection);
 
     for (const type of types) {
       try {
-        const result = await connection.client.post<{
+        const result = await client.post<{
           data?: Array<Record<string, string | number | undefined>>;
         }>('/v5/card/transaction/query-asset-records', {
           type,

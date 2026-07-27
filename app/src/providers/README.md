@@ -14,6 +14,8 @@ One connect creates separate Portwallet accounts for Funding, UTA, and Earn when
 
 On connect, the provider calls `/v5/user/query-api` and blocks actions that the key cannot perform (`Withdraw`, `AccountTransfer`, `ExchangeHistory`, `Earn`, `BitCard`, read-only).
 
+BitCard is typically not available on a read-write trading key. Pass optional `cardApiKey` / `cardApiSecret` (a read-only key with only Bybit Card permission), or attach them later via `attachCardCredentials`. Card endpoints use that client when present.
+
 Earn accounts are view-only; stake/redeem is not available in the app. Bybit Card is attached to the Funding account.
 
 ## Cards

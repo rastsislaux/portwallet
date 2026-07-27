@@ -22,3 +22,26 @@ export function getBybitServer(id: BybitServerId): BybitServerOption {
   if (!found) throw new Error(`Unknown Bybit server: ${id}`);
   return found;
 }
+
+/** Website API Management page for creating keys (not the REST host). */
+export function getBybitApiManagementUrl(serverId: BybitServerId): string {
+  switch (serverId) {
+    case 'testnet':
+      return 'https://testnet.bybit.com/app/user/api-management';
+    case 'mainnet_nl':
+      return 'https://www.bybit.nl/app/user/api-management';
+    case 'mainnet_eu':
+      return 'https://www.bybit.eu/app/user/api-management';
+    case 'mainnet_tr':
+      return 'https://www.bybit.tr/app/user/api-management';
+    case 'mainnet_ae':
+      return 'https://www.bybit.ae/app/user/api-management';
+    case 'mainnet_kz':
+      return 'https://www.bybit.kz/app/user/api-management';
+    case 'mainnet_id':
+      return 'https://www.bybit.id/app/user/api-management';
+    case 'mainnet':
+    default:
+      return 'https://www.bybit.com/app/user/api-management';
+  }
+}
