@@ -12,6 +12,7 @@ import {
 } from '../components/icons';
 import { PwaInstallBanner } from '../components/PwaInstallBanner';
 import { formatSecondaryApprox } from '../fx/formatSecondaryApprox';
+import { usePortfolioDayChange } from '../hooks/usePortfolioDayChange';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -25,6 +26,23 @@ function formatUpdatedAt(iso: string | null): string | null {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatSignedFiat(value: number): string {
+  const abs = formatFiat(Math.abs(value));
+  if (value > 0) return `+${abs}`;
+  if (value < 0) return `−${abs}`;
+  return abs;
+}
+
+function formatSignedPct(value: number): string {
+  const abs = Math.abs(value).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (value > 0) return `+${abs}%`;
+  if (value < 0) return `−${abs}%`;
+  return `${abs}%`;
 }
 
 export function HomeScreen() {
@@ -42,9 +60,11 @@ export function HomeScreen() {
     displayCurrency,
     formatFromUsd,
     formatFromUsdParts,
+    convertFromUsd,
     hideBelowThresholdUsd,
     hideBelowThresholdAmount,
     hideBelowThresholdCurrency,
+    show24hChangeEnabled,
     mainCurrency,
     secondaryCurrency,
     usdToSecondaryRate,
@@ -56,6 +76,12 @@ export function HomeScreen() {
   }, [assets, hideBelowThresholdUsd]);
 
   const hiddenCount = assets.length - visibleAssets.length;
+
+  const dayChange = usePortfolioDayChange(
+    show24hChangeEnabled && accounts.length > 0,
+    assets,
+    lastUpdatedAt,
+  );
 
   const secondaryApprox = useMemo(
     () =>
@@ -70,6 +96,15 @@ export function HomeScreen() {
   );
   const balance = formatFromUsdParts(totalFiatUsd);
   const updatedLabel = formatUpdatedAt(lastUpdatedAt);
+
+  const changeTone =
+    dayChange.change == null
+      ? 'flat'
+      : dayChange.change.changeUsd > 0
+        ? 'up'
+        : dayChange.change.changeUsd < 0
+          ? 'down'
+          : 'flat';
 
   if (!ready) {
     return (
@@ -144,6 +179,27 @@ export function HomeScreen() {
               <span className="portfolio-total__dec">.{balance.decimal}</span>
               <span className="portfolio-total__currency">{displayCurrency}</span>
             </div>
+            {show24hChangeEnabled && dayChange.status === 'ready' && dayChange.change ? (
+              <div
+                className={`portfolio-total__change portfolio-total__change--${changeTone} tabular`}
+                aria-label={`24 hour change ${formatSignedFiat(convertFromUsd(dayChange.change.changeUsd))} ${displayCurrency}${
+                  dayChange.change.changePct == null
+                    ? ''
+                    : ` (${formatSignedPct(dayChange.change.changePct)})`
+                }`}
+              >
+                <span>
+                  {formatSignedFiat(convertFromUsd(dayChange.change.changeUsd))}{' '}
+                  {displayCurrency}
+                </span>
+                {dayChange.change.changePct != null ? (
+                  <span className="portfolio-total__change-pct">
+                    ({formatSignedPct(dayChange.change.changePct)})
+                  </span>
+                ) : null}
+                <span className="portfolio-total__change-label">24h</span>
+              </div>
+            ) : null}
             {secondaryApprox ? (
               <div className="portfolio-total__meta">{secondaryApprox}</div>
             ) : null}

@@ -396,6 +396,41 @@ img {
   white-space: nowrap;
 }
 
+.portfolio-total__change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--text-body);
+  line-height: 20px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+.portfolio-total__change--up {
+  color: var(--success);
+}
+
+.portfolio-total__change--down {
+  color: var(--danger);
+}
+
+.portfolio-total__change--flat {
+  color: var(--ink-secondary);
+}
+
+.portfolio-total__change-pct {
+  font-weight: 500;
+}
+
+.portfolio-total__change-label {
+  font-size: var(--text-caption);
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: var(--tracking-meta);
+  color: var(--ink-quaternary);
+}
+
 /* ─── Buttons ───────────────────────────────────────────── */
 
 .btn {
