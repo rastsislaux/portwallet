@@ -1,4 +1,4 @@
-import { formatAssetQty, formatFiat } from '../components/Amount';
+import { formatFiat, formatQty } from '../components/Amount';
 import {
   CRYPTO_USD_FALLBACKS,
   getSecondaryCurrency,
@@ -22,6 +22,11 @@ export function usdPriceForCrypto(
   }
   const fallback = CRYPTO_USD_FALLBACKS[symbol];
   return fallback != null && fallback > 0 ? fallback : null;
+}
+
+function formatSecondaryCryptoQty(symbol: string, qty: number): string {
+  if (symbol === 'USDT' || symbol === 'USDC') return formatQty(qty, 2, 2);
+  return formatQty(qty, 4);
 }
 
 /**
@@ -52,5 +57,5 @@ export function formatSecondaryApprox(opts: {
   if (px == null) return null;
   const qty = opts.totalFiatUsd / px;
   if (!Number.isFinite(qty)) return null;
-  return `≈ ${formatAssetQty(meta.code, qty)} ${meta.code}`;
+  return `≈ ${formatSecondaryCryptoQty(meta.code, qty)} ${meta.code}`;
 }

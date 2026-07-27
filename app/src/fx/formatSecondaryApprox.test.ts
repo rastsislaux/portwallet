@@ -35,7 +35,7 @@ describe('formatSecondaryApprox', () => {
         assets,
         usdToSecondaryRate: null,
       }),
-    ).toBe('≈ 0.1000 BTC');
+    ).toBe('≈ 0.1 BTC');
   });
 
   it('formats ETH secondary with fallback price', () => {
@@ -47,7 +47,19 @@ describe('formatSecondaryApprox', () => {
         assets: [],
         usdToSecondaryRate: null,
       }),
-    ).toBe('≈ 1.0000 ETH');
+    ).toBe('≈ 1 ETH');
+  });
+
+  it('formats stablecoin secondary with two decimals', () => {
+    expect(
+      formatSecondaryApprox({
+        totalFiatUsd: 1234.5,
+        secondaryCode: 'USDT',
+        mainCurrency: 'EUR',
+        assets: [],
+        usdToSecondaryRate: null,
+      }),
+    ).toBe('≈ 1,234.50 USDT');
   });
 
   it('formats fiat secondary via FX rate', () => {
