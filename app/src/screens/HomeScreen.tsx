@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AccountFilter } from '../components/AccountFilter';
-import { formatAssetQty, formatFiat, formatQty } from '../components/Amount';
+import { formatAssetQty, formatFiat } from '../components/Amount';
 import {
   CryptoIcon,
   IconExchange,
@@ -11,6 +11,7 @@ import {
   IconSettings,
 } from '../components/icons';
 import { PwaInstallBanner } from '../components/PwaInstallBanner';
+import { formatSecondaryApprox } from '../fx/formatSecondaryApprox';
 import { usePortfolioDayChange } from '../hooks/usePortfolioDayChange';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
@@ -64,6 +65,9 @@ export function HomeScreen() {
     hideBelowThresholdAmount,
     hideBelowThresholdCurrency,
     show24hChangeEnabled,
+    mainCurrency,
+    secondaryCurrency,
+    usdToSecondaryRate,
   } = useSettings();
 
   const visibleAssets = useMemo(() => {
@@ -79,10 +83,17 @@ export function HomeScreen() {
     lastUpdatedAt,
   );
 
-  const btc = assets.find((a) => a.symbol === 'BTC');
-  const btcApprox = btc
-    ? formatQty(totalFiatUsd / (btc.fiatValueUsd / btc.quantity || 68420), 4)
-    : formatQty(totalFiatUsd / 68420, 4);
+  const secondaryApprox = useMemo(
+    () =>
+      formatSecondaryApprox({
+        totalFiatUsd,
+        secondaryCode: secondaryCurrency,
+        mainCurrency,
+        assets,
+        usdToSecondaryRate,
+      }),
+    [totalFiatUsd, secondaryCurrency, mainCurrency, assets, usdToSecondaryRate],
+  );
   const balance = formatFromUsdParts(totalFiatUsd);
   const updatedLabel = formatUpdatedAt(lastUpdatedAt);
 
@@ -189,7 +200,9 @@ export function HomeScreen() {
                 <span className="portfolio-total__change-label">24h</span>
               </div>
             ) : null}
-            <div className="portfolio-total__meta">≈ {btcApprox} BTC</div>
+            {secondaryApprox ? (
+              <div className="portfolio-total__meta">{secondaryApprox}</div>
+            ) : null}
           </div>
 
           <div className="action-row">

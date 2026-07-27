@@ -11,6 +11,9 @@ export function SettingsScreen() {
     mainCurrency,
     setMainCurrency,
     currencies,
+    secondaryCurrency,
+    setSecondaryCurrency,
+    secondaryCurrencies,
     rateStatus,
     rateQuote,
     rateError,
@@ -80,6 +83,45 @@ export function SettingsScreen() {
                     {c.code} — {c.name}
                   </option>
                 ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grouped-row grouped-row--field">
+            <div className="grouped-row__body">
+              <div className="grouped-row__title">Secondary currency</div>
+              <div className="grouped-row__meta">
+                Approximate total under portfolio worth
+              </div>
+            </div>
+            <div className="currency-select">
+              <span className="currency-select__value">
+                {secondaryCurrency}
+                <IconChevronDown size={14} strokeWidth={2} />
+              </span>
+              <select
+                aria-label="Secondary currency"
+                value={secondaryCurrency}
+                onChange={(e) => setSecondaryCurrency(e.target.value)}
+              >
+                <optgroup label="Fiat">
+                  {secondaryCurrencies
+                    .filter((c) => c.kind === 'fiat')
+                    .map((c) => (
+                      <option key={`fiat-${c.code}`} value={c.code}>
+                        {c.code} — {c.name}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Crypto">
+                  {secondaryCurrencies
+                    .filter((c) => c.kind === 'crypto')
+                    .map((c) => (
+                      <option key={`crypto-${c.code}`} value={c.code}>
+                        {c.code} — {c.name}
+                      </option>
+                    ))}
+                </optgroup>
               </select>
             </div>
           </div>
@@ -298,8 +340,9 @@ export function SettingsScreen() {
           ))}
           <p className="settings-sources__note">
             Fiat display converts from USD portfolio values using the sources above.
-            Crypto prices themselves come from connected providers; 24h change uses
-            Bybit public market data.
+            Crypto prices themselves come from connected providers. The secondary
+            total uses the same FX sources for fiat, or provider prices for crypto;
+            24h change uses Bybit public market data.
           </p>
         </div>
       </div>
