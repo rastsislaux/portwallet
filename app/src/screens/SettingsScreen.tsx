@@ -88,7 +88,7 @@ export function SettingsScreen() {
             <div className="grouped-row__body">
               <div className="grouped-row__title">24h portfolio change</div>
               <div className="grouped-row__meta">
-                Show today’s total worth change under the balance
+                Show today's total worth change under the balance
               </div>
             </div>
             <label className="settings-switch">
