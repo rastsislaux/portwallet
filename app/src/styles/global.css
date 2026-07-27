@@ -1772,18 +1772,23 @@ img {
 }
 
 .card-rail {
+  --card-rail-item: min(85%, 360px);
+  --card-rail-glow: 24px;
   position: relative;
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: var(--space-3);
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  padding-inline: var(--pad-screen);
-  padding-block: 14px;
-  margin-block: -14px;
+  scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+}
+
+.card-rail::before,
+.card-rail::after {
+  content: '';
+  flex: 0 0 max(0px, calc((100% - var(--card-rail-item)) / 2));
 }
 
 .card-rail::-webkit-scrollbar {
@@ -1791,15 +1796,21 @@ img {
 }
 
 .card-rail__item {
-  flex: 0 0 85%;
-  width: 85%;
-  max-width: 360px;
+  box-sizing: border-box;
+  flex: 0 0 var(--card-rail-item);
+  width: var(--card-rail-item);
+  padding: var(--card-rail-glow);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+.card-rail__item + .card-rail__item {
+  margin-left: calc(var(--space-3) - 2 * var(--card-rail-glow));
 }
 
 @media (max-width: 420px) {
-  .card-rail__item {
-    flex-basis: 88%;
-    width: 88%;
+  .card-rail {
+    --card-rail-item: min(88%, 360px);
   }
 }
 
@@ -1926,8 +1937,8 @@ img {
 
 .payment-card.is-selected {
   box-shadow:
-    0 0 24px rgba(0, 0, 0, 0.16),
-    0 12px 28px rgba(0, 0, 0, 0.18),
+    0 0 16px rgba(0, 0, 0, 0.14),
+    0 8px 20px rgba(0, 0, 0, 0.16),
     0 2px 6px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
 }
