@@ -36,6 +36,7 @@ import {
   type SavedAccountCredentials,
 } from './accountStorage';
 import { BybitCryptoProvider } from '../providers/bybit/BybitCryptoProvider';
+import { isBybitRateLimitError } from '../providers/bybit/client';
 
 export type AccountFilter = 'all' | string;
 
@@ -47,6 +48,12 @@ export type AccountCardStatus = {
 
 export type RestoreFailure = {
   id: string;
+  nickname: string;
+  message: string;
+};
+
+export type CardDataWarning = {
+  accountId: string;
   nickname: string;
   message: string;
 };
@@ -65,6 +72,7 @@ type WalletContextValue = {
   cardOperations: CardOperation[];
   accountCardStatuses: AccountCardStatus[];
   fundingByAccountId: Record<string, FundingAssetBalance[]>;
+  cardWarnings: CardDataWarning[];
   custodySummary: string;
   availableProviderTypes: ReturnType<ProviderRegistry['listAvailableTypes']>;
   restoreFailures: RestoreFailure[];
@@ -148,6 +156,16 @@ function buildCustodySummary(accounts: WalletAccount[]): string {
   return `Custodial · ${venues.join(', ')}`;
 }
 
+function describeCardLoadFailure(err: unknown, nickname: string): string {
+  if (isBybitRateLimitError(err)) {
+    return `Bybit rate-limited card activity for ${nickname}. Showing the last loaded data — try again in a moment.`;
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return `Could not refresh card data for ${nickname}: ${err.message}`;
+  }
+  return `Could not refresh card data for ${nickname}. Showing the last loaded data.`;
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [accounts, setAccounts] = useState<WalletAccount[]>([]);
@@ -162,8 +180,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [fundingByAccountId, setFundingByAccountId] = useState<
     Record<string, FundingAssetBalance[]>
   >({});
+  const [cardWarnings, setCardWarnings] = useState<CardDataWarning[]>([]);
   const [restoreFailures, setRestoreFailures] = useState<RestoreFailure[]>([]);
   const instanceToSavedId = useRef(new Map<string, string>());
+  const cardsRef = useRef<ProviderCard[]>([]);
+  const cardOperationsRef = useRef<CardOperation[]>([]);
+  const fundingRef = useRef<Record<string, FundingAssetBalance[]>>({});
+
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
+  useEffect(() => {
+    cardOperationsRef.current = cardOperations;
+  }, [cardOperations]);
+  useEffect(() => {
+    fundingRef.current = fundingByAccountId;
+  }, [fundingByAccountId]);
 
   const selectedAccounts = useMemo(() => {
     if (filter === 'all') return accounts;
@@ -177,6 +209,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const nextOps: CardOperation[] = [];
     const statuses: AccountCardStatus[] = [];
     const fundingMap: Record<string, FundingAssetBalance[]> = {};
+    const warnings: CardDataWarning[] = [];
 
     for (const account of selectedAccounts) {
       const provider = registry.getForAccount(account.id);
@@ -184,20 +217,38 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       txs.push(...(await provider.getTransactions(account.id)));
 
       const capability = await provider.getCardCapability(account.id);
-      const accountCards = capability.supported
-        ? await provider.listCards(account.id)
-        : [];
-      const ops = capability.supported
-        ? await provider.getCardOperations(account.id)
-        : [];
-      const funding = capability.supported
-        ? await provider.listFundingBalances(account.id)
-        : [];
+      if (!capability.supported) {
+        statuses.push({ account, capability, cards: [] });
+        fundingMap[account.id] = [];
+        continue;
+      }
 
-      nextCards.push(...accountCards);
-      nextOps.push(...ops);
-      statuses.push({ account, capability, cards: accountCards });
-      fundingMap[account.id] = funding;
+      try {
+        const accountCards = await provider.listCards(account.id);
+        const ops = await provider.getCardOperations(account.id);
+        const funding = await provider.listFundingBalances(account.id);
+        nextCards.push(...accountCards);
+        nextOps.push(...ops);
+        statuses.push({ account, capability, cards: accountCards });
+        fundingMap[account.id] = funding;
+      } catch (err) {
+        const priorCards = cardsRef.current.filter(
+          (c) => c.accountId === account.id,
+        );
+        const priorOps = cardOperationsRef.current.filter(
+          (o) => o.accountId === account.id,
+        );
+        const priorFunding = fundingRef.current[account.id] ?? [];
+        nextCards.push(...priorCards);
+        nextOps.push(...priorOps);
+        statuses.push({ account, capability, cards: priorCards });
+        fundingMap[account.id] = priorFunding;
+        warnings.push({
+          accountId: account.id,
+          nickname: account.nickname,
+          message: describeCardLoadFailure(err, account.nickname),
+        });
+      }
     }
 
     txs.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
@@ -208,6 +259,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setCardOperations(nextOps);
     setAccountCardStatuses(statuses);
     setFundingByAccountId(fundingMap);
+    setCardWarnings(warnings);
   }, [selectedAccounts]);
 
   const didBootstrap = useRef(false);
@@ -433,6 +485,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       cardOperations,
       accountCardStatuses,
       fundingByAccountId,
+      cardWarnings,
       custodySummary,
       availableProviderTypes,
       restoreFailures,
@@ -461,6 +514,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       cardOperations,
       accountCardStatuses,
       fundingByAccountId,
+      cardWarnings,
       custodySummary,
       availableProviderTypes,
       restoreFailures,

@@ -371,11 +371,26 @@ export class MockCryptoProvider implements CryptoProvider {
       const { balanceUsd, symbols } = sumEligibleFunding(funding);
       return [
         {
-          id: nextId('card'),
+          id: `${account.id}_card_4281`,
           accountId: account.id,
           providerType: 'bybit',
           label: 'Bybit Card',
           lastFour: '4281',
+          network: 'visa',
+          status: 'active',
+          holderName: account.nickname.replace(/\s+Bybit$/i, '') || 'Cardholder',
+          currency: 'USD',
+          balanceUsd,
+          balanceSource: 'calculated',
+          fundingAssetSymbols: symbols,
+          expiresLabel: '09/28',
+        },
+        {
+          id: `${account.id}_card_9054`,
+          accountId: account.id,
+          providerType: 'bybit',
+          label: 'Bybit Card · Metal',
+          lastFour: '9054',
           network: 'visa',
           status: 'active',
           holderName: account.nickname.replace(/\s+Bybit$/i, '') || 'Cardholder',
@@ -391,7 +406,7 @@ export class MockCryptoProvider implements CryptoProvider {
     if (account.providerType === 'binance') {
       return [
         {
-          id: nextId('card'),
+          id: `${account.id}_card_7712`,
           accountId: account.id,
           providerType: 'binance',
           label: 'Binance Card',
