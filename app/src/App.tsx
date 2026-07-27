@@ -10,6 +10,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { ReceiveScreen } from './screens/ReceiveScreen';
 import { SendScreen } from './screens/SendScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { PwaInstallProvider } from './state/PwaInstallContext';
 import { SettingsProvider } from './state/SettingsContext';
 import { WalletProvider } from './state/WalletContext';
 
@@ -24,34 +25,36 @@ const CryptoIconGallery = import.meta.env.DEV
 export default function App() {
   return (
     <SettingsProvider>
-      <WalletProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <Routes>
-            <Route element={<AppShell />}>
-              <Route index element={<HomeScreen />} />
-              <Route path="activity" element={<ActivityScreen />} />
-              <Route path="cards" element={<CardsScreen />} />
-              <Route path="exchange" element={<ExchangeScreen />} />
-              <Route path="settings" element={<SettingsScreen />} />
-              <Route path="accounts" element={<AccountsScreen />} />
-              <Route path="asset/:assetId" element={<AssetDetailScreen />} />
-              <Route path="send" element={<SendScreen />} />
-              <Route path="receive" element={<ReceiveScreen />} />
-              {CryptoIconGallery ? (
-                <Route
-                  path="dev/crypto-icons"
-                  element={
-                    <Suspense fallback={null}>
-                      <CryptoIconGallery />
-                    </Suspense>
-                  }
-                />
-              ) : null}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </WalletProvider>
+      <PwaInstallProvider>
+        <WalletProvider>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route index element={<HomeScreen />} />
+                <Route path="activity" element={<ActivityScreen />} />
+                <Route path="cards" element={<CardsScreen />} />
+                <Route path="exchange" element={<ExchangeScreen />} />
+                <Route path="settings" element={<SettingsScreen />} />
+                <Route path="accounts" element={<AccountsScreen />} />
+                <Route path="asset/:assetId" element={<AssetDetailScreen />} />
+                <Route path="send" element={<SendScreen />} />
+                <Route path="receive" element={<ReceiveScreen />} />
+                {CryptoIconGallery ? (
+                  <Route
+                    path="dev/crypto-icons"
+                    element={
+                      <Suspense fallback={null}>
+                        <CryptoIconGallery />
+                      </Suspense>
+                    }
+                  />
+                ) : null}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </WalletProvider>
+      </PwaInstallProvider>
     </SettingsProvider>
   );
 }

@@ -92,6 +92,14 @@ img {
   margin-bottom: var(--space-8);
 }
 
+.screen--home .header-block:has(+ .pwa-install) {
+  margin-bottom: var(--space-4);
+}
+
+.screen--home .pwa-install {
+  margin-bottom: var(--space-6);
+}
+
 .screen--home .portfolio-total {
   margin-bottom: var(--space-7);
 }
@@ -521,6 +529,9 @@ img {
   color: var(--ink-tertiary);
   font-size: var(--text-caption);
   font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .btn--text:hover {
@@ -2251,6 +2262,66 @@ img {
   font: inherit;
   padding: 0;
   min-height: 0;
+}
+
+/* ─── PWA install ───────────────────────────────────────── */
+
+.pwa-install {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  animation: screen-in var(--duration) var(--ease);
+}
+
+.pwa-install__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 14px 14px 14px 16px;
+}
+
+.pwa-install__copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pwa-install__title {
+  font-size: var(--text-callout);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.pwa-install__meta {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: 1.35;
+  color: var(--ink-tertiary);
+}
+
+.pwa-install__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pwa-install__cta {
+  min-height: 36px;
+  padding: 0 12px;
+  gap: 6px;
+}
+
+.pwa-install__hide {
+  color: var(--ink-quaternary);
+}
+
+.btn--text svg {
+  flex-shrink: 0;
 }
 
 .settings-sources {
