@@ -27,8 +27,10 @@ export function SettingsScreen() {
     setHideBelowThresholdCurrency,
     show24hChangeEnabled,
     setShow24hChangeEnabled,
+    hiddenCardIds,
+    setCardHidden,
   } = useSettings();
-  const { refresh, isRefreshing, lastUpdatedAt, accounts } = useWallet();
+  const { refresh, isRefreshing, lastUpdatedAt, accounts, cards } = useWallet();
   const {
     showInstallInSettings,
     installHint,
@@ -238,6 +240,38 @@ export function SettingsScreen() {
           ) : null}
         </p>
       </div>
+
+      {cards.length > 0 ? (
+        <div className="section-block">
+          <div className="section-label">Card visibility</div>
+          <div className="grouped-list">
+            {cards.map((card) => (
+              <div key={card.id} className="grouped-row grouped-row--field">
+                <div className="grouped-row__body">
+                  <div className="grouped-row__title">
+                    {card.label} ···{card.lastFour}
+                  </div>
+                  <div className="grouped-row__meta">
+                    {card.network.toUpperCase()} · {card.status}
+                  </div>
+                </div>
+                <label className="settings-switch">
+                  <input
+                    type="checkbox"
+                    checked={!hiddenCardIds.has(card.id)}
+                    onChange={(e) => setCardHidden(card.id, !e.target.checked)}
+                    aria-label={`Show card ${card.lastFour}`}
+                  />
+                  <span className="settings-switch__track" aria-hidden="true" />
+                </label>
+              </div>
+            ))}
+          </div>
+          <p className="settings-rate-meta">
+            Hidden cards won't appear in the Cards tab.
+          </p>
+        </div>
+      ) : null}
 
       {showInstallInSettings ? (
         <div className="section-block">

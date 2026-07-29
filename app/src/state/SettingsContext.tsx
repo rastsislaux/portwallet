@@ -30,6 +30,7 @@ const STORAGE_HIDE_BELOW_ENABLED = 'portwallet.hideBelowThreshold.enabled';
 const STORAGE_HIDE_BELOW_AMOUNT = 'portwallet.hideBelowThreshold.amount';
 const STORAGE_HIDE_BELOW_CURRENCY = 'portwallet.hideBelowThreshold.currency';
 const STORAGE_SHOW_24H_CHANGE = 'portwallet.show24hChange.enabled';
+const STORAGE_HIDDEN_CARD_IDS = 'portwallet.hiddenCardIds';
 
 const DEFAULT_HIDE_BELOW_AMOUNT = 1;
 
@@ -68,6 +69,8 @@ type SettingsContextValue = {
   /** Show 24h mark-to-market portfolio change under the home total. */
   show24hChangeEnabled: boolean;
   setShow24hChangeEnabled: (enabled: boolean) => void;
+  hiddenCardIds: Set<string>;
+  setCardHidden: (cardId: string, hidden: boolean) => void;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -113,6 +116,17 @@ function readStoredAmount(key: string, fallback: number): number {
     /* ignore */
   }
   return fallback;
+}
+
+function readStoredStringSet(key: string): Set<string> {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const arr = JSON.parse(stored);
+      if (Array.isArray(arr)) return new Set(arr.filter((s): s is string => typeof s === 'string'));
+    }
+  } catch { /* ignore */ }
+  return new Set();
 }
 
 function writeStorage(key: string, value: string) {
@@ -183,6 +197,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [show24hChangeEnabled, setShow24hChangeState] = useState(() =>
     readStoredBool(STORAGE_SHOW_24H_CHANGE, true),
   );
+  const [hiddenCardIds, setHiddenCardIds] = useState(() =>
+    readStoredStringSet(STORAGE_HIDDEN_CARD_IDS),
+  );
   const [thresholdRateQuote, setThresholdRateQuote] = useState<FxQuote | null>(null);
   const [secondaryRateQuote, setSecondaryRateQuote] = useState<FxQuote | null>(null);
 
@@ -221,6 +238,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const setShow24hChangeEnabled = useCallback((enabled: boolean) => {
     setShow24hChangeState(enabled);
     writeStorage(STORAGE_SHOW_24H_CHANGE, String(enabled));
+  }, []);
+
+  const setCardHidden = useCallback((cardId: string, hidden: boolean) => {
+    setHiddenCardIds((prev) => {
+      const next = new Set(prev);
+      if (hidden) next.add(cardId);
+      else next.delete(cardId);
+      writeStorage(STORAGE_HIDDEN_CARD_IDS, JSON.stringify([...next]));
+      return next;
+    });
   }, []);
 
   const refreshRate = useCallback(async () => {
@@ -382,6 +409,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       hideBelowThresholdUsd,
       show24hChangeEnabled,
       setShow24hChangeEnabled,
+      hiddenCardIds,
+      setCardHidden,
     }),
     [
       mainCurrency,
@@ -408,6 +437,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       hideBelowThresholdUsd,
       show24hChangeEnabled,
       setShow24hChangeEnabled,
+      hiddenCardIds,
+      setCardHidden,
     ],
   );
 
