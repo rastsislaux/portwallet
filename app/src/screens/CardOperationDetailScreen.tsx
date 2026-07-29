@@ -35,11 +35,13 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function formatTokenAmount(value: number): string {
-  return value.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  });
+function sameMoney(
+  a: number | undefined,
+  aCur: string | undefined,
+  b: number | undefined,
+  bCur: string | undefined,
+): boolean {
+  return a != null && b != null && a === b && aCur === bCur;
 }
 
 export function CardOperationDetailScreen() {
@@ -79,15 +81,17 @@ export function CardOperationDetailScreen() {
   const formattedAmount = `${sign}${formatLocalAmount(op.amountFiat, op.currency)} ${op.currency}`;
   const lastFour = op.cardLastFour || card?.lastFour;
   const location = [op.merchantCity, op.merchantCountry].filter(Boolean).join(', ');
-  const tokenAmount = op.amountTokenValue ?? op.quantity;
-  const tokenSymbol = op.tokenSymbol ?? op.assetSymbol;
-  const showSettlement =
+
+  const chargedLabel = op.tokenSymbol ? 'Token charged' : 'Amount charged';
+  const showCardAmount =
+    op.cardAmount != null &&
+    op.cardCurrency &&
+    !sameMoney(op.cardAmount, op.cardCurrency, op.amountFiat, op.currency);
+  const showTotal =
     op.settlementAmount != null &&
     op.settlementCurrency &&
-    !(
-      op.settlementAmount === op.amountFiat &&
-      op.settlementCurrency === op.currency
-    );
+    !sameMoney(op.settlementAmount, op.settlementCurrency, op.amountFiat, op.currency) &&
+    !sameMoney(op.settlementAmount, op.settlementCurrency, op.cardAmount, op.cardCurrency);
 
   return (
     <section className="screen">
@@ -123,27 +127,36 @@ export function CardOperationDetailScreen() {
           ) : null}
 
           <div className="op-detail__row">
-            <span className="op-detail__label">Payment amount</span>
+            <span className="op-detail__label">{chargedLabel}</span>
             <span className="op-detail__value tabular">
               {formatLocalAmount(op.amountFiat, op.currency)} {op.currency}
             </span>
           </div>
 
-          {tokenAmount != null && tokenSymbol ? (
+          {showCardAmount ? (
             <div className="op-detail__row">
-              <span className="op-detail__label">Token charged</span>
+              <span className="op-detail__label">Card amount</span>
               <span className="op-detail__value tabular">
-                {formatTokenAmount(tokenAmount)} {tokenSymbol}
+                {formatLocalAmount(op.cardAmount!, op.cardCurrency!)} {op.cardCurrency}
               </span>
             </div>
           ) : null}
 
-          {showSettlement ? (
+          {showTotal ? (
             <div className="op-detail__row">
-              <span className="op-detail__label">Card settlement</span>
+              <span className="op-detail__label">Total with fees</span>
               <span className="op-detail__value tabular">
                 {formatLocalAmount(op.settlementAmount!, op.settlementCurrency!)}{' '}
                 {op.settlementCurrency}
+              </span>
+            </div>
+          ) : null}
+
+          {op.feeAmount != null && op.feeCurrency ? (
+            <div className="op-detail__row">
+              <span className="op-detail__label">Fees</span>
+              <span className="op-detail__value tabular">
+                {formatLocalAmount(op.feeAmount, op.feeCurrency)} {op.feeCurrency}
               </span>
             </div>
           ) : null}
