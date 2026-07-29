@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { IconAccounts, IconBack, IconChevronDown, IconDownload } from '../components/icons';
 import { MARKET_DATA_SOURCES } from '../fx/rates';
 import { usePwaInstall } from '../state/PwaInstallContext';
@@ -7,6 +7,7 @@ import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
 export function SettingsScreen() {
+  const navigate = useNavigate();
   const {
     mainCurrency,
     setMainCurrency,
@@ -33,7 +34,7 @@ export function SettingsScreen() {
   const { refresh, isRefreshing, lastUpdatedAt, accounts, cards } = useWallet();
   const {
     showInstallInSettings,
-    installHint,
+    canPrompt,
     promptInstall,
     showInstallButtonAgain,
   } = usePwaInstall();
@@ -281,14 +282,18 @@ export function SettingsScreen() {
               <div className="grouped-row__body">
                 <div className="grouped-row__title">Install Portwallet</div>
                 <div className="grouped-row__meta">
-                  {installHint ?? 'Add to your home screen for quick access'}
+                  Add to your home screen for quick access
                 </div>
               </div>
               <button
                 type="button"
                 className="btn btn--text"
                 onClick={() => {
-                  void promptInstall();
+                  if (canPrompt) {
+                    void promptInstall();
+                    return;
+                  }
+                  navigate('/install');
                 }}
               >
                 <IconDownload size={16} strokeWidth={2.25} />
