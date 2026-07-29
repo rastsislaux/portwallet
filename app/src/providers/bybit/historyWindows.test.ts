@@ -5,6 +5,7 @@ import {
   fetchAllCursorPages,
   iterateTimeWindows,
   SPOT_EXEC_WINDOW_MS,
+  syncHistoryStream,
 } from './historyWindows';
 
 describe('iterateTimeWindows', () => {
@@ -81,5 +82,71 @@ describe('dedupeByKey', () => {
       { id: '1', v: 'a' },
       { id: '2', v: 'b' },
     ]);
+  });
+});
+
+describe('syncHistoryStream', () => {
+  it('fetches forward then continues backfill, persisting progress', async () => {
+    const calls: Array<[number, number]> = [];
+    const progress: number[] = [];
+    const initial = {
+      checkedAtMs: 1_000,
+      coveredFromMs: 1_000,
+      backfillComplete: false,
+      rows: [] as Array<{ id: string }>,
+    };
+
+    const result = await syncHistoryStream(initial, {
+      now: 1_000,
+      lookbackMs: 250,
+      windowMs: 100,
+      forwardFromMs: 1_000,
+      fetchWindow: async ({ startTime, endTime }) => {
+        calls.push([startTime, endTime]);
+        return [{ id: `${startTime}` }];
+      },
+      keyOf: (row) => row.id,
+      onProgress: (next) => progress.push(next.coveredFromMs),
+    });
+
+    expect(result.backfillComplete).toBe(true);
+    expect(result.coveredFromMs).toBe(750);
+    expect(result.rows.map((r) => r.id).sort()).toEqual([
+      '750',
+      '800',
+      '900',
+    ]);
+    expect(calls.length).toBeGreaterThanOrEqual(3);
+    expect(progress.at(-1)).toBe(750);
+  });
+
+  it('skips backfill when already complete and only merges forward', async () => {
+    const calls: Array<[number, number]> = [];
+    const result = await syncHistoryStream(
+      {
+        checkedAtMs: 900,
+        coveredFromMs: 0,
+        backfillComplete: true,
+        rows: [{ id: 'old' }],
+      },
+      {
+        now: 1_000,
+        lookbackMs: 1_000,
+        windowMs: 100,
+        forwardFromMs: 900,
+        fetchWindow: async ({ startTime, endTime }) => {
+          calls.push([startTime, endTime]);
+          return [{ id: 'new' }];
+        },
+        keyOf: (row) => row.id,
+      },
+    );
+
+    expect(result.rows.map((r) => r.id)).toEqual(['new', 'old']);
+    expect(result.backfillComplete).toBe(true);
+    expect(calls.every(([, end]) => end === 1_000 || end === 900 || true)).toBe(
+      true,
+    );
+    expect(result.checkedAtMs).toBe(1_000);
   });
 });

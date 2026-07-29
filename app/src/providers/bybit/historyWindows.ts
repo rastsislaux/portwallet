@@ -87,3 +87,92 @@ export function dedupeByKey<T>(items: T[], keyOf: (item: T) => string): T[] {
   }
   return out;
 }
+
+export type SyncableHistoryStream<T> = {
+  checkedAtMs: number;
+  coveredFromMs: number;
+  backfillComplete: boolean;
+  rows: T[];
+};
+
+/**
+ * Merge newly fetched rows into a history stream, then optionally continue
+ * walking backward until `lookbackMs` is covered. Calls `onProgress` after
+ * each window so callers can persist partial progress.
+ */
+export async function syncHistoryStream<T>(
+  state: SyncableHistoryStream<T>,
+  options: {
+    now: number;
+    lookbackMs: number;
+    windowMs: number;
+    /** Start of the forward incremental window (usually checkedAt − overlap). */
+    forwardFromMs: number;
+    fetchWindow: (window: TimeWindow) => Promise<T[]>;
+    keyOf: (row: T) => string;
+    onProgress?: (next: SyncableHistoryStream<T>) => void;
+    /** Limit backward windows per call so UI can refresh with partial history. */
+    maxBackfillWindows?: number;
+  },
+): Promise<SyncableHistoryStream<T>> {
+  const {
+    now,
+    lookbackMs,
+    windowMs,
+    forwardFromMs,
+    fetchWindow,
+    keyOf,
+    onProgress,
+    maxBackfillWindows = Number.POSITIVE_INFINITY,
+  } = options;
+
+  let next: SyncableHistoryStream<T> = {
+    checkedAtMs: state.checkedAtMs,
+    coveredFromMs: state.coveredFromMs,
+    backfillComplete: state.backfillComplete,
+    rows: [...state.rows],
+  };
+
+  const merge = (rows: T[]) => {
+    next = {
+      ...next,
+      rows: dedupeByKey([...rows, ...next.rows], keyOf),
+    };
+  };
+
+  const forwardStart = Math.max(0, Math.min(forwardFromMs, now));
+  if (forwardStart < now) {
+    const recent = await fetchAcrossTimeWindows(
+      fetchWindow,
+      now,
+      now - forwardStart,
+      windowMs,
+    );
+    merge(recent);
+  }
+  next = { ...next, checkedAtMs: now };
+  onProgress?.(next);
+
+  const targetFrom = Math.max(0, now - lookbackMs);
+  let windows = 0;
+  while (
+    !next.backfillComplete &&
+    next.coveredFromMs > targetFrom &&
+    windows < maxBackfillWindows
+  ) {
+    const endTime = next.coveredFromMs;
+    const startTime = Math.max(targetFrom, endTime - windowMs);
+    const rows = await fetchWindow({ startTime, endTime });
+    merge(rows);
+    next = {
+      ...next,
+      coveredFromMs: startTime,
+      backfillComplete: startTime <= targetFrom,
+    };
+    onProgress?.(next);
+    windows += 1;
+    if (startTime <= targetFrom) break;
+  }
+
+  return next;
+}

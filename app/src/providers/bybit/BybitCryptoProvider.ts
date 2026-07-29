@@ -38,13 +38,22 @@ import { convertHistoryAccountTypes, convertMatchesProduct } from './convertHist
 import {
   DEPOSIT_LOOKBACK_MS,
   DEPOSIT_WINDOW_MS,
-  dedupeByKey,
-  fetchAcrossTimeWindows,
   fetchAllCursorPages,
   SPOT_EXEC_LOOKBACK_MS,
   SPOT_EXEC_WINDOW_MS,
+  syncHistoryStream,
   type TimeWindow,
 } from './historyWindows';
+import {
+  bybitHistoryCacheKey,
+  emptyAccountHistory,
+  incrementalStartMs,
+  readBybitAccountHistory,
+  writeBybitAccountHistory,
+  type BybitAccountHistory,
+  type ConvertHistoryRow,
+  type DepositHistoryRow,
+} from './historyStorage';
 import {
   spotExecutionToTransaction,
   type SpotExecutionRow,
@@ -54,9 +63,12 @@ const BYBIT_CARD_ELIGIBLE = new Set(['USDT', 'USDC']);
 const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'FDUSD', 'USDE']);
 /** Share one query-asset-records response across listCards + getCardOperations. */
 const CARD_RECORDS_CACHE_TTL_MS = 30_000;
-/** Spot fills are historical; refresh rarely — full lookback is expensive. */
-const SPOT_EXEC_CACHE_TTL_MS = 15 * 60_000;
-const DEPOSIT_CACHE_TTL_MS = 15 * 60_000;
+/** In-memory short TTL; durable history lives in localStorage. */
+const HISTORY_MEMORY_TTL_MS = 30_000;
+/** Spot: ~8 weeks of backfill per refresh so txs appear before a full 2y scan. */
+const SPOT_BACKFILL_WINDOWS_PER_SYNC = 8;
+/** Deposits use 30-day windows — a few per refresh is enough. */
+const DEPOSIT_BACKFILL_WINDOWS_PER_SYNC = 4;
 
 type CardAssetRecord = {
   pan4?: string;
@@ -91,26 +103,19 @@ type CardRecordsCache = {
 type SpotExecCache = {
   fetchedAt: number;
   rows: SpotExecutionRow[];
-  /** True after a full lookback scan completed (even if empty). */
-  historyScanned: boolean;
   inFlight?: Promise<SpotExecutionRow[]>;
-};
-
-type DepositRow = {
-  txID?: string;
-  coin?: string;
-  amount?: string;
-  chain?: string;
-  status?: number;
-  successAt?: string;
-  createTime?: string;
 };
 
 type DepositCache = {
   fetchedAt: number;
-  rows: DepositRow[];
-  historyScanned: boolean;
-  inFlight?: Promise<DepositRow[]>;
+  rows: DepositHistoryRow[];
+  inFlight?: Promise<DepositHistoryRow[]>;
+};
+
+type ConvertCache = {
+  fetchedAt: number;
+  rows: ConvertHistoryRow[];
+  inFlight?: Promise<ConvertHistoryRow[]>;
 };
 
 type Connection = {
@@ -121,11 +126,15 @@ type Connection = {
   permissions: ProviderPermissionSnapshot;
   coinNames: Map<string, string>;
   bybitServer: BybitServerId;
+  /** Stable localStorage key: `${server}:${userId}`. */
+  historyKey: string;
+  persistedHistory: BybitAccountHistory;
   priceCache: Map<string, number>;
   priceCachedAt: number;
   cardRecordsCache?: CardRecordsCache;
   spotExecCache?: SpotExecCache;
   depositCache?: DepositCache;
+  convertCache?: ConvertCache;
 };
 
 type Session = {
@@ -242,6 +251,13 @@ export class BybitCryptoProvider implements CryptoProvider {
       );
     }
 
+    const historyKey = bybitHistoryCacheKey(
+      bybitServer,
+      keyInfo.userID ?? apiKey.slice(0, 8),
+    );
+    const persistedHistory =
+      readBybitAccountHistory(historyKey) ?? emptyAccountHistory();
+
     const connectionId = `bybit_${bybitServer}_${keyInfo.userID ?? 'user'}_${Date.now()}`;
     const connection: Connection = {
       id: connectionId,
@@ -250,8 +266,22 @@ export class BybitCryptoProvider implements CryptoProvider {
       permissions,
       coinNames: new Map(),
       bybitServer,
+      historyKey,
+      persistedHistory,
       priceCache: new Map(),
       priceCachedAt: 0,
+      spotExecCache: {
+        fetchedAt: persistedHistory.spot.backfillComplete ? Date.now() : 0,
+        rows: persistedHistory.spot.rows,
+      },
+      depositCache: {
+        fetchedAt: persistedHistory.deposits.backfillComplete ? Date.now() : 0,
+        rows: persistedHistory.deposits.rows,
+      },
+      convertCache: {
+        fetchedAt: persistedHistory.converts.backfillComplete ? Date.now() : 0,
+        rows: persistedHistory.converts.rows,
+      },
     };
     this.connections.set(connectionId, connection);
 
@@ -508,12 +538,7 @@ export class BybitCryptoProvider implements CryptoProvider {
       }
 
       try {
-        const convertAccountType = convertHistoryAccountTypes(product);
-        const convertRows = await this.loadConvertHistory(
-          connection,
-          convertAccountType,
-        );
-
+        const convertRows = await this.loadConvertHistory(connection);
         const forProduct = convertRows.filter((row) =>
           convertMatchesProduct(row.accountType, product),
         );
@@ -1291,6 +1316,10 @@ export class BybitCryptoProvider implements CryptoProvider {
     return records;
   }
 
+  private persistHistory(connection: Connection): void {
+    writeBybitAccountHistory(connection.historyKey, connection.persistedHistory);
+  }
+
   private async loadSpotExecutions(
     connection: Connection,
   ): Promise<SpotExecutionRow[]> {
@@ -1299,34 +1328,32 @@ export class BybitCryptoProvider implements CryptoProvider {
     if (cached?.inFlight) {
       return cached.inFlight;
     }
-    if (cached && now - cached.fetchedAt < SPOT_EXEC_CACHE_TTL_MS) {
+    if (
+      cached &&
+      connection.persistedHistory.spot.backfillComplete &&
+      now - cached.fetchedAt < HISTORY_MEMORY_TTL_MS
+    ) {
       return cached.rows;
     }
 
     const inFlight = this.requestSpotExecutions(connection);
     connection.spotExecCache = {
       fetchedAt: 0,
-      rows: cached?.rows ?? [],
-      historyScanned: cached?.historyScanned ?? false,
+      rows: cached?.rows ?? connection.persistedHistory.spot.rows,
       inFlight,
     };
 
     try {
       const rows = await inFlight;
-      connection.spotExecCache = {
-        fetchedAt: Date.now(),
-        rows,
-        historyScanned: true,
-      };
+      connection.spotExecCache = { fetchedAt: Date.now(), rows };
       return rows;
     } catch (err) {
       connection.spotExecCache = cached
-        ? {
-            fetchedAt: cached.fetchedAt,
-            rows: cached.rows,
-            historyScanned: cached.historyScanned,
-          }
-        : undefined;
+        ? { fetchedAt: cached.fetchedAt, rows: cached.rows }
+        : {
+            fetchedAt: 0,
+            rows: connection.persistedHistory.spot.rows,
+          };
       throw err;
     }
   }
@@ -1334,25 +1361,32 @@ export class BybitCryptoProvider implements CryptoProvider {
   private async requestSpotExecutions(
     connection: Connection,
   ): Promise<SpotExecutionRow[]> {
-    const previous = connection.spotExecCache?.rows ?? [];
-    const historyScanned = connection.spotExecCache?.historyScanned ?? false;
     const now = Date.now();
-
-    if (!historyScanned) {
-      const rows = await fetchAcrossTimeWindows(
-        (window) => this.fetchSpotExecWindow(connection, window),
+    const synced = await syncHistoryStream(connection.persistedHistory.spot, {
+      now,
+      lookbackMs: SPOT_EXEC_LOOKBACK_MS,
+      windowMs: SPOT_EXEC_WINDOW_MS,
+      forwardFromMs: incrementalStartMs(
+        connection.persistedHistory.spot.checkedAtMs,
         now,
-        SPOT_EXEC_LOOKBACK_MS,
-        SPOT_EXEC_WINDOW_MS,
-      );
-      return dedupeByKey(rows, spotExecKey);
-    }
-
-    const recent = await this.fetchSpotExecWindow(connection, {
-      startTime: now - SPOT_EXEC_WINDOW_MS,
-      endTime: now,
+      ),
+      fetchWindow: (window) => this.fetchSpotExecWindow(connection, window),
+      keyOf: spotExecKey,
+      maxBackfillWindows: SPOT_BACKFILL_WINDOWS_PER_SYNC,
+      onProgress: (next) => {
+        connection.persistedHistory = {
+          ...connection.persistedHistory,
+          spot: next,
+        };
+        this.persistHistory(connection);
+      },
     });
-    return dedupeByKey([...recent, ...previous], spotExecKey);
+    connection.persistedHistory = {
+      ...connection.persistedHistory,
+      spot: synced,
+    };
+    this.persistHistory(connection);
+    return synced.rows;
   }
 
   private async fetchSpotExecWindow(
@@ -1379,75 +1413,83 @@ export class BybitCryptoProvider implements CryptoProvider {
 
   private async loadDepositRecords(
     connection: Connection,
-  ): Promise<DepositRow[]> {
+  ): Promise<DepositHistoryRow[]> {
     const cached = connection.depositCache;
     const now = Date.now();
     if (cached?.inFlight) {
       return cached.inFlight;
     }
-    if (cached && now - cached.fetchedAt < DEPOSIT_CACHE_TTL_MS) {
+    if (
+      cached &&
+      connection.persistedHistory.deposits.backfillComplete &&
+      now - cached.fetchedAt < HISTORY_MEMORY_TTL_MS
+    ) {
       return cached.rows;
     }
 
     const inFlight = this.requestDepositRecords(connection);
     connection.depositCache = {
       fetchedAt: 0,
-      rows: cached?.rows ?? [],
-      historyScanned: cached?.historyScanned ?? false,
+      rows: cached?.rows ?? connection.persistedHistory.deposits.rows,
       inFlight,
     };
 
     try {
       const rows = await inFlight;
-      connection.depositCache = {
-        fetchedAt: Date.now(),
-        rows,
-        historyScanned: true,
-      };
+      connection.depositCache = { fetchedAt: Date.now(), rows };
       return rows;
     } catch (err) {
       connection.depositCache = cached
-        ? {
-            fetchedAt: cached.fetchedAt,
-            rows: cached.rows,
-            historyScanned: cached.historyScanned,
-          }
-        : undefined;
+        ? { fetchedAt: cached.fetchedAt, rows: cached.rows }
+        : {
+            fetchedAt: 0,
+            rows: connection.persistedHistory.deposits.rows,
+          };
       throw err;
     }
   }
 
   private async requestDepositRecords(
     connection: Connection,
-  ): Promise<DepositRow[]> {
-    const previous = connection.depositCache?.rows ?? [];
-    const historyScanned = connection.depositCache?.historyScanned ?? false;
+  ): Promise<DepositHistoryRow[]> {
     const now = Date.now();
-
-    if (!historyScanned) {
-      const rows = await fetchAcrossTimeWindows(
-        (window) => this.fetchDepositWindow(connection, window),
+    const synced = await syncHistoryStream(
+      connection.persistedHistory.deposits,
+      {
         now,
-        DEPOSIT_LOOKBACK_MS,
-        DEPOSIT_WINDOW_MS,
-      );
-      return dedupeByKey(rows, (row) => row.txID ?? '');
-    }
-
-    const recent = await this.fetchDepositWindow(connection, {
-      startTime: now - DEPOSIT_WINDOW_MS,
-      endTime: now,
-    });
-    return dedupeByKey([...recent, ...previous], (row) => row.txID ?? '');
+        lookbackMs: DEPOSIT_LOOKBACK_MS,
+        windowMs: DEPOSIT_WINDOW_MS,
+        forwardFromMs: incrementalStartMs(
+          connection.persistedHistory.deposits.checkedAtMs,
+          now,
+        ),
+        fetchWindow: (window) => this.fetchDepositWindow(connection, window),
+        keyOf: (row) => row.txID ?? '',
+        maxBackfillWindows: DEPOSIT_BACKFILL_WINDOWS_PER_SYNC,
+        onProgress: (next) => {
+          connection.persistedHistory = {
+            ...connection.persistedHistory,
+            deposits: next,
+          };
+          this.persistHistory(connection);
+        },
+      },
+    );
+    connection.persistedHistory = {
+      ...connection.persistedHistory,
+      deposits: synced,
+    };
+    this.persistHistory(connection);
+    return synced.rows;
   }
 
   private async fetchDepositWindow(
     connection: Connection,
     window: TimeWindow,
-  ): Promise<DepositRow[]> {
+  ): Promise<DepositHistoryRow[]> {
     return fetchAllCursorPages(async (cursor) => {
       const result = await connection.client.get<{
-        rows?: DepositRow[];
+        rows?: DepositHistoryRow[];
         nextPageCursor?: string;
       }>('/v5/asset/deposit/query-record', {
         limit: 50,
@@ -1464,45 +1506,109 @@ export class BybitCryptoProvider implements CryptoProvider {
 
   private async loadConvertHistory(
     connection: Connection,
-    accountType: string,
-  ): Promise<
-    Array<{
-      exchangeTxId?: string;
-      fromCoin?: string;
-      toCoin?: string;
-      fromAmount?: string;
-      toAmount?: string;
-      exchangeStatus?: string;
-      createdAt?: string;
-      accountType?: string;
-    }>
-  > {
-    type ConvertRow = {
-      exchangeTxId?: string;
-      fromCoin?: string;
-      toCoin?: string;
-      fromAmount?: string;
-      toAmount?: string;
-      exchangeStatus?: string;
-      createdAt?: string;
-      accountType?: string;
+  ): Promise<ConvertHistoryRow[]> {
+    const cached = connection.convertCache;
+    const now = Date.now();
+    if (cached?.inFlight) {
+      return cached.inFlight;
+    }
+    if (
+      cached &&
+      connection.persistedHistory.converts.backfillComplete &&
+      now - cached.fetchedAt < HISTORY_MEMORY_TTL_MS
+    ) {
+      return cached.rows;
+    }
+
+    const inFlight = this.requestConvertHistory(connection);
+    connection.convertCache = {
+      fetchedAt: 0,
+      rows: cached?.rows ?? connection.persistedHistory.converts.rows,
+      inFlight,
     };
 
-    const all: ConvertRow[] = [];
+    try {
+      const rows = await inFlight;
+      connection.convertCache = { fetchedAt: Date.now(), rows };
+      return rows;
+    } catch (err) {
+      connection.convertCache = cached
+        ? { fetchedAt: cached.fetchedAt, rows: cached.rows }
+        : {
+            fetchedAt: 0,
+            rows: connection.persistedHistory.converts.rows,
+          };
+      throw err;
+    }
+  }
+
+  private async requestConvertHistory(
+    connection: Connection,
+  ): Promise<ConvertHistoryRow[]> {
+    const now = Date.now();
+    const previous = connection.persistedHistory.converts;
+    const knownIds = new Set(
+      previous.rows.map((row) => row.exchangeTxId).filter(Boolean) as string[],
+    );
+
+    // Converts have no time filter — page until empty, or until we only see
+    // already-known ids after a completed backfill.
+    const fetched: ConvertHistoryRow[] = [];
     const limit = 100;
+    let reachedKnown = false;
     for (let index = 1; index <= 50; index++) {
       const result = await connection.client.get<{
-        list?: ConvertRow[];
+        list?: ConvertHistoryRow[];
       }>('/v5/asset/exchange/query-convert-history', {
-        accountType,
+        accountType: [
+          ...convertHistoryAccountTypes('FUND').split(','),
+          ...convertHistoryAccountTypes('UNIFIED').split(','),
+        ].join(','),
         limit,
         index,
       });
       const page = result.list ?? [];
-      all.push(...page);
+      if (page.length === 0) break;
+
+      let newOnPage = 0;
+      for (const row of page) {
+        fetched.push(row);
+        const id = row.exchangeTxId;
+        if (id && knownIds.has(id)) {
+          if (previous.backfillComplete) reachedKnown = true;
+        } else if (id) {
+          newOnPage += 1;
+        }
+      }
+
+      if (previous.backfillComplete && reachedKnown && newOnPage === 0) break;
       if (page.length < limit) break;
     }
-    return dedupeByKey(all, (row) => row.exchangeTxId ?? '');
+
+    const rows = (() => {
+      const seen = new Set<string>();
+      const out: ConvertHistoryRow[] = [];
+      for (const row of [...fetched, ...previous.rows]) {
+        const key = row.exchangeTxId ?? '';
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(row);
+      }
+      return out;
+    })();
+
+    const synced = {
+      checkedAtMs: now,
+      coveredFromMs: previous.coveredFromMs,
+      backfillComplete: true,
+      rows,
+    };
+    connection.persistedHistory = {
+      ...connection.persistedHistory,
+      converts: synced,
+    };
+    this.persistHistory(connection);
+    return rows;
   }
 
   /** Fill missing deposit USD costs from hourly candles near the deposit time. */
