@@ -249,6 +249,8 @@ export interface CardOperation {
   merchant: string;
   amountFiat: number;
   currency: string;
+  amountTokenValue?: number;
+  tokenSymbol?: string;
   assetSymbol?: string;
   quantity?: number;
   createdAt: string;
