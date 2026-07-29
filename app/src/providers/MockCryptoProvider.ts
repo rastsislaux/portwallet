@@ -273,6 +273,10 @@ function seedCardOperations(
   accountId: string,
   providerLabel: string,
 ): CardOperation[] {
+  const lastFour = cardId.includes('_card_')
+    ? cardId.split('_card_').pop() ?? '····'
+    : '····';
+
   return [
     {
       id: nextId('cardop'),
@@ -285,10 +289,15 @@ function seedCardOperations(
       currency: 'KZT',
       amountTokenValue: 48.99,
       tokenSymbol: 'USDT',
+      settlementAmount: 48.99,
+      settlementCurrency: 'USD',
       assetSymbol: 'USDT',
       quantity: 48.99,
       createdAt: new Date(Date.now() - 3600000 * 6).toISOString(),
       providerLabel,
+      cardLastFour: lastFour,
+      merchantCity: 'Almaty',
+      merchantCountry: 'KZ',
     },
     {
       id: nextId('cardop'),
@@ -301,10 +310,15 @@ function seedCardOperations(
       currency: 'KZT',
       amountTokenValue: 18.4,
       tokenSymbol: 'USDT',
+      settlementAmount: 18.4,
+      settlementCurrency: 'USD',
       assetSymbol: 'USDT',
       quantity: 18.4,
       createdAt: new Date(Date.now() - 900000).toISOString(),
       providerLabel,
+      cardLastFour: lastFour,
+      merchantCity: 'Almaty',
+      merchantCountry: 'KZ',
     },
     {
       id: nextId('cardop'),
@@ -317,10 +331,15 @@ function seedCardOperations(
       currency: 'JPY',
       amountTokenValue: 18.08,
       tokenSymbol: 'USDT',
+      settlementAmount: 18.08,
+      settlementCurrency: 'USD',
       assetSymbol: 'USDT',
       quantity: 18.08,
       createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
       providerLabel,
+      cardLastFour: lastFour,
+      merchantCity: 'Tokyo',
+      merchantCountry: 'JP',
     },
     {
       id: nextId('cardop'),
@@ -333,9 +352,14 @@ function seedCardOperations(
       currency: 'EUR',
       amountTokenValue: 108.5,
       tokenSymbol: 'USDT',
+      settlementAmount: 108.5,
+      settlementCurrency: 'USD',
       failureReason: 'Daily ATM limit exceeded',
       createdAt: new Date(Date.now() - 86400000).toISOString(),
       providerLabel,
+      cardLastFour: lastFour,
+      merchantCity: 'Berlin',
+      merchantCountry: 'DE',
     },
     {
       id: nextId('cardop'),
@@ -348,10 +372,15 @@ function seedCardOperations(
       currency: 'USD',
       amountTokenValue: 24.5,
       tokenSymbol: 'USDC',
+      settlementAmount: 24.5,
+      settlementCurrency: 'USD',
       assetSymbol: 'USDC',
       quantity: 24.5,
       createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
       providerLabel,
+      cardLastFour: lastFour,
+      merchantCity: 'Seattle',
+      merchantCountry: 'US',
     },
     {
       id: nextId('cardop'),
@@ -364,8 +393,11 @@ function seedCardOperations(
       currency: 'USD',
       amountTokenValue: 0.62,
       tokenSymbol: 'USDT',
+      settlementAmount: 0.62,
+      settlementCurrency: 'USD',
       createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
       providerLabel,
+      cardLastFour: lastFour,
     },
     {
       id: nextId('cardop'),
@@ -378,10 +410,13 @@ function seedCardOperations(
       currency: 'USD',
       amountTokenValue: 200,
       tokenSymbol: 'USDT',
+      settlementAmount: 200,
+      settlementCurrency: 'USD',
       assetSymbol: 'USDT',
       quantity: 200,
       createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
       providerLabel,
+      cardLastFour: lastFour,
     },
   ];
 }

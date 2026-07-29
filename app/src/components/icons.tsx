@@ -1,9 +1,11 @@
 import type { ComponentType } from 'react';
 import {
   ArrowDown,
+  ArrowDownToLine,
   ArrowDownUp,
   ArrowLeft,
   ArrowUpRight,
+  Banknote,
   Check,
   ChevronDown,
   Copy,
@@ -11,14 +13,17 @@ import {
   Download,
   History,
   Home,
+  Percent,
   RefreshCw,
   Repeat2,
+  RotateCcw,
   Settings,
+  ShoppingBag,
   WalletCards,
   X,
   type LucideProps,
 } from 'lucide-react';
-import type { ProviderType } from '../domain/types';
+import type { CardOperationKind, ProviderType } from '../domain/types';
 export { CryptoIcon } from './CryptoIcon';
 
 type IconProps = LucideProps & {
@@ -50,6 +55,30 @@ export const IconBack = withDefaults(ArrowLeft);
 export const IconCheck = withDefaults(Check);
 export const IconDownload = withDefaults(Download);
 export const IconX = withDefaults(X);
+export const IconPurchase = withDefaults(ShoppingBag);
+export const IconRefund = withDefaults(RotateCcw);
+export const IconAtm = withDefaults(Banknote);
+export const IconFee = withDefaults(Percent);
+export const IconTopUp = withDefaults(ArrowDownToLine);
+
+const cardKindIcons: Record<CardOperationKind, ReturnType<typeof withDefaults>> = {
+  purchase: IconPurchase,
+  refund: IconRefund,
+  atm: IconAtm,
+  fee: IconFee,
+  top_up: IconTopUp,
+};
+
+export function CardKindIcon({
+  kind,
+  size = 20,
+}: {
+  kind: CardOperationKind;
+  size?: number;
+}) {
+  const Icon = cardKindIcons[kind] ?? IconPurchase;
+  return <Icon size={size} />;
+}
 
 const providerMeta: Record<
   ProviderType,

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { formatFiat, formatQty } from '../components/Amount';
+import { formatFiat, formatLocalAmount, formatQty } from '../components/Amount';
 import { CardCarousel } from '../components/CardCarousel';
-import { CryptoIcon, IconRefresh } from '../components/icons';
+import { CardKindIcon, CryptoIcon, IconRefresh } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
 import type { CardOperation, ProviderCard } from '../domain/types';
 import { useSettings } from '../state/SettingsContext';
@@ -265,7 +265,7 @@ function CardDetail({
             {operations.map((op) => (
               <div
                 key={op.id}
-                className="tx-row tx-row--clickable"
+                className="tx-row tx-row--clickable tx-row--card-op"
                 role="button"
                 tabIndex={0}
                 onClick={() => navigate(`/cards/op/${op.id}`)}
@@ -273,19 +273,18 @@ function CardDetail({
                   if (e.key === 'Enter' || e.key === ' ') navigate(`/cards/op/${op.id}`);
                 }}
               >
-                {op.assetSymbol ? (
-                  <span className="tx-row__icon">
-                    <CryptoIcon symbol={op.assetSymbol} size={32} decorative />
-                  </span>
-                ) : null}
-                <span className="tx-row__title">
-                  {labelCardKind(op.kind)}
-                  {op.merchant ? ` · ${op.merchant}` : ''}
+                <span className="tx-row__icon tx-row__icon--kind" aria-hidden="true">
+                  <CardKindIcon kind={op.kind} size={16} />
                 </span>
-                <span className="tx-row__amount tabular">
-                  {signedFiatLocal(op)}
-                </span>
+                <span className="tx-row__title">{op.merchant || labelCardKind(op.kind)}</span>
+                <span className="tx-row__amount tabular">{signedFiatLocal(op)}</span>
                 <span className="tx-row__meta">
+                  {formatOpTime(op.createdAt)}
+                  {op.cardLastFour || card.lastFour
+                    ? ` · ··${op.cardLastFour || card.lastFour}`
+                    : ''}
+                </span>
+                <span className="tx-row__status">
                   <StatusBadge status={op.status} />
                 </span>
               </div>
@@ -314,15 +313,19 @@ function labelCardKind(kind: CardOperation['kind']): string {
   }
 }
 
-function formatLocalAmount(value: number, currency: string): string {
-  const isWholeUnit = ['KZT', 'JPY', 'KRW', 'VND', 'CLP', 'ISK', 'HUF'].includes(currency);
-  if (isWholeUnit) {
-    return Math.round(value).toLocaleString('en-US');
-  }
-  return value.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+function formatOpTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  const time = d.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
   });
+  if (sameDay) return time;
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 function signedFiatLocal(op: CardOperation): string {
