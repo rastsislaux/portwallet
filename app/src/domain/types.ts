@@ -247,15 +247,23 @@ export interface CardOperation {
   kind: CardOperationKind;
   status: OperationStatus;
   merchant: string;
+  /** Original merchant / local payment amount (e.g. 1490 KZT). */
   amountFiat: number;
   currency: string;
+  /** Crypto/token actually charged (e.g. 3.19 USDT). */
   amountTokenValue?: number;
   tokenSymbol?: string;
+  /** Card-network settlement / bill amount (e.g. 3.19 USD). */
+  settlementAmount?: number;
+  settlementCurrency?: string;
   assetSymbol?: string;
   quantity?: number;
   createdAt: string;
   providerLabel: string;
   failureReason?: string;
+  cardLastFour?: string;
+  merchantCity?: string;
+  merchantCountry?: string;
 }
 
 export interface FundingAssetBalance {

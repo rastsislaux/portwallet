@@ -19,6 +19,27 @@ export function formatFiat(value: number): string {
   });
 }
 
+const WHOLE_UNIT_CURRENCIES = new Set([
+  'KZT',
+  'JPY',
+  'KRW',
+  'VND',
+  'CLP',
+  'ISK',
+  'HUF',
+]);
+
+/** Format a fiat amount in its native currency (whole units for JPY/KZT/etc.). */
+export function formatLocalAmount(value: number, currency: string): string {
+  if (WHOLE_UNIT_CURRENCIES.has(currency.toUpperCase())) {
+    return Math.round(value).toLocaleString('en-US');
+  }
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function formatFiatParts(value: number): { integer: string; decimal: string } {
   const formatted = formatFiat(value);
   const [integer, decimal = '00'] = formatted.split('.');
