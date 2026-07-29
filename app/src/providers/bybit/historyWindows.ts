@@ -1,0 +1,89 @@
+/** Bybit execution list: max span per request is 7 days. */
+export const SPOT_EXEC_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+/** Bybit documents ~2 years of execution history. */
+export const SPOT_EXEC_LOOKBACK_MS = 730 * 24 * 60 * 60 * 1000;
+
+/** Bybit on-chain deposit records: max span per request is 30 days. */
+export const DEPOSIT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+export const DEPOSIT_LOOKBACK_MS = 730 * 24 * 60 * 60 * 1000;
+
+export type TimeWindow = {
+  startTime: number;
+  endTime: number;
+};
+
+/**
+ * Yields [startTime, endTime] windows walking backward from `endMs`,
+ * each at most `windowMs` wide, covering `lookbackMs` of history.
+ */
+export function* iterateTimeWindows(
+  endMs: number,
+  lookbackMs: number,
+  windowMs: number,
+): Generator<TimeWindow> {
+  if (!(endMs > 0) || !(lookbackMs > 0) || !(windowMs > 0)) return;
+
+  let end = endMs;
+  const earliest = Math.max(0, endMs - lookbackMs);
+
+  while (end > earliest) {
+    const start = Math.max(earliest, end - windowMs);
+    yield { startTime: start, endTime: end };
+    if (start <= earliest) break;
+    // Adjacent windows share the boundary ms; callers should dedupe by id.
+    end = start;
+  }
+}
+
+export type CursorPage<T> = {
+  items: T[];
+  nextPageCursor?: string;
+};
+
+/**
+ * Fetch every page in a single time window via Bybit-style cursor pagination.
+ */
+export async function fetchAllCursorPages<T>(
+  fetchPage: (cursor: string | undefined) => Promise<CursorPage<T>>,
+  maxPages = 50,
+): Promise<T[]> {
+  const out: T[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < maxPages; page++) {
+    const result = await fetchPage(cursor);
+    out.push(...result.items);
+    const next = result.nextPageCursor?.trim();
+    if (!next) break;
+    cursor = next;
+  }
+  return out;
+}
+
+/**
+ * Walk backward over time windows and collect all rows (caller dedupes).
+ */
+export async function fetchAcrossTimeWindows<T>(
+  fetchWindow: (window: TimeWindow) => Promise<T[]>,
+  endMs: number,
+  lookbackMs: number,
+  windowMs: number,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (const window of iterateTimeWindows(endMs, lookbackMs, windowMs)) {
+    const rows = await fetchWindow(window);
+    out.push(...rows);
+  }
+  return out;
+}
+
+export function dedupeByKey<T>(items: T[], keyOf: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const key = keyOf(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}

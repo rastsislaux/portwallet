@@ -34,6 +34,17 @@ import {
   parseBybitPermissions,
   type BybitApiKeyInfo,
 } from './permissions';
+import { convertHistoryAccountTypes, convertMatchesProduct } from './convertHistory';
+import {
+  DEPOSIT_LOOKBACK_MS,
+  DEPOSIT_WINDOW_MS,
+  dedupeByKey,
+  fetchAcrossTimeWindows,
+  fetchAllCursorPages,
+  SPOT_EXEC_LOOKBACK_MS,
+  SPOT_EXEC_WINDOW_MS,
+  type TimeWindow,
+} from './historyWindows';
 import {
   spotExecutionToTransaction,
   type SpotExecutionRow,
@@ -43,7 +54,9 @@ const BYBIT_CARD_ELIGIBLE = new Set(['USDT', 'USDC']);
 const STABLECOINS = new Set(['USDT', 'USDC', 'DAI', 'FDUSD', 'USDE']);
 /** Share one query-asset-records response across listCards + getCardOperations. */
 const CARD_RECORDS_CACHE_TTL_MS = 30_000;
-const SPOT_EXEC_CACHE_TTL_MS = 30_000;
+/** Spot fills are historical; refresh rarely — full lookback is expensive. */
+const SPOT_EXEC_CACHE_TTL_MS = 15 * 60_000;
+const DEPOSIT_CACHE_TTL_MS = 15 * 60_000;
 
 type CardAssetRecord = {
   pan4?: string;
@@ -78,7 +91,26 @@ type CardRecordsCache = {
 type SpotExecCache = {
   fetchedAt: number;
   rows: SpotExecutionRow[];
+  /** True after a full lookback scan completed (even if empty). */
+  historyScanned: boolean;
   inFlight?: Promise<SpotExecutionRow[]>;
+};
+
+type DepositRow = {
+  txID?: string;
+  coin?: string;
+  amount?: string;
+  chain?: string;
+  status?: number;
+  successAt?: string;
+  createTime?: string;
+};
+
+type DepositCache = {
+  fetchedAt: number;
+  rows: DepositRow[];
+  historyScanned: boolean;
+  inFlight?: Promise<DepositRow[]>;
 };
 
 type Connection = {
@@ -93,6 +125,7 @@ type Connection = {
   priceCachedAt: number;
   cardRecordsCache?: CardRecordsCache;
   spotExecCache?: SpotExecCache;
+  depositCache?: DepositCache;
 };
 
 type Session = {
@@ -358,42 +391,29 @@ export class BybitCryptoProvider implements CryptoProvider {
     const txs: Transaction[] = [];
     const product = session.product;
 
-    if (product === 'FUND' || product === 'UNIFIED') {
+    if (product === 'FUND') {
       try {
-        const deposits = await connection.client.get<{
-          rows?: Array<{
-            txID?: string;
-            coin?: string;
-            amount?: string;
-            chain?: string;
-            status?: number;
-            successAt?: string;
-            createTime?: string;
-          }>;
-        }>('/v5/asset/deposit/query-record', { limit: 50 });
-
-        if (product === 'FUND') {
-          for (const row of deposits.rows ?? []) {
-            const statusNum = row.status ?? 0;
-            const assetSymbol = (row.coin ?? '').toUpperCase();
-            const quantity = num(row.amount);
-            txs.push({
-              id: row.txID || nextId('tx'),
-              accountId,
-              kind: 'deposit',
-              status:
-                statusNum === 3 ? 'completed' : statusNum === 4 ? 'failed' : 'pending',
-              assetSymbol,
-              quantity,
-              fiatValueUsd: STABLECOINS.has(assetSymbol) ? quantity : 0,
-              networkName: row.chain,
-              createdAt: toIso(row.successAt || row.createTime),
-              providerLabel: label,
-              product: 'FUND',
-            });
-          }
-          await this.enrichDepositFiatValues(connection, txs);
+        const depositRows = await this.loadDepositRecords(connection);
+        for (const row of depositRows) {
+          const statusNum = row.status ?? 0;
+          const assetSymbol = (row.coin ?? '').toUpperCase();
+          const quantity = num(row.amount);
+          txs.push({
+            id: row.txID || nextId('tx'),
+            accountId,
+            kind: 'deposit',
+            status:
+              statusNum === 3 ? 'completed' : statusNum === 4 ? 'failed' : 'pending',
+            assetSymbol,
+            quantity,
+            fiatValueUsd: STABLECOINS.has(assetSymbol) ? quantity : 0,
+            networkName: row.chain,
+            createdAt: toIso(row.successAt || row.createTime),
+            providerLabel: label,
+            product: 'FUND',
+          });
         }
+        await this.enrichDepositFiatValues(connection, txs);
       } catch {
         /* optional */
       }
@@ -488,28 +508,19 @@ export class BybitCryptoProvider implements CryptoProvider {
       }
 
       try {
-        const converts = await connection.client.get<{
-          list?: Array<{
-            exchangeTxId?: string;
-            fromCoin?: string;
-            toCoin?: string;
-            fromAmount?: string;
-            toAmount?: string;
-            exchangeStatus?: string;
-            createdAt?: string;
-            accountType?: string;
-          }>;
-        }>('/v5/asset/exchange/query-convert-history', { limit: 50 });
+        const convertAccountType = convertHistoryAccountTypes(product);
+        const convertRows = await this.loadConvertHistory(
+          connection,
+          convertAccountType,
+        );
 
-        const convertRows = (converts.list ?? []).filter((row) => {
-          const accountType = (row.accountType ?? '').toUpperCase();
-          if (!accountType) return product === 'FUND';
-          return accountType === product;
-        });
+        const forProduct = convertRows.filter((row) =>
+          convertMatchesProduct(row.accountType, product),
+        );
 
         const needsPrice = [
           ...new Set(
-            convertRows
+            forProduct
               .map((row) => (row.fromCoin ?? '').toUpperCase())
               .filter((coin) => coin && !STABLECOINS.has(coin)),
           ),
@@ -518,7 +529,7 @@ export class BybitCryptoProvider implements CryptoProvider {
           await this.refreshPrices(connection, needsPrice);
         }
 
-        for (const row of convertRows) {
+        for (const row of forProduct) {
           const st = (row.exchangeStatus ?? '').toLowerCase();
           const fromCoin = (row.fromCoin ?? '').toUpperCase();
           const toCoin = (row.toCoin ?? '').toUpperCase();
@@ -1296,16 +1307,25 @@ export class BybitCryptoProvider implements CryptoProvider {
     connection.spotExecCache = {
       fetchedAt: 0,
       rows: cached?.rows ?? [],
+      historyScanned: cached?.historyScanned ?? false,
       inFlight,
     };
 
     try {
       const rows = await inFlight;
-      connection.spotExecCache = { fetchedAt: Date.now(), rows };
+      connection.spotExecCache = {
+        fetchedAt: Date.now(),
+        rows,
+        historyScanned: true,
+      };
       return rows;
     } catch (err) {
       connection.spotExecCache = cached
-        ? { fetchedAt: cached.fetchedAt, rows: cached.rows }
+        ? {
+            fetchedAt: cached.fetchedAt,
+            rows: cached.rows,
+            historyScanned: cached.historyScanned,
+          }
         : undefined;
       throw err;
     }
@@ -1314,13 +1334,175 @@ export class BybitCryptoProvider implements CryptoProvider {
   private async requestSpotExecutions(
     connection: Connection,
   ): Promise<SpotExecutionRow[]> {
-    const result = await connection.client.get<{
-      list?: SpotExecutionRow[];
-    }>('/v5/execution/list', {
-      category: 'spot',
-      limit: 100,
+    const previous = connection.spotExecCache?.rows ?? [];
+    const historyScanned = connection.spotExecCache?.historyScanned ?? false;
+    const now = Date.now();
+
+    if (!historyScanned) {
+      const rows = await fetchAcrossTimeWindows(
+        (window) => this.fetchSpotExecWindow(connection, window),
+        now,
+        SPOT_EXEC_LOOKBACK_MS,
+        SPOT_EXEC_WINDOW_MS,
+      );
+      return dedupeByKey(rows, spotExecKey);
+    }
+
+    const recent = await this.fetchSpotExecWindow(connection, {
+      startTime: now - SPOT_EXEC_WINDOW_MS,
+      endTime: now,
     });
-    return result.list ?? [];
+    return dedupeByKey([...recent, ...previous], spotExecKey);
+  }
+
+  private async fetchSpotExecWindow(
+    connection: Connection,
+    window: TimeWindow,
+  ): Promise<SpotExecutionRow[]> {
+    return fetchAllCursorPages(async (cursor) => {
+      const result = await connection.client.get<{
+        list?: SpotExecutionRow[];
+        nextPageCursor?: string;
+      }>('/v5/execution/list', {
+        category: 'spot',
+        limit: 100,
+        startTime: window.startTime,
+        endTime: window.endTime,
+        cursor,
+      });
+      return {
+        items: result.list ?? [],
+        nextPageCursor: result.nextPageCursor,
+      };
+    });
+  }
+
+  private async loadDepositRecords(
+    connection: Connection,
+  ): Promise<DepositRow[]> {
+    const cached = connection.depositCache;
+    const now = Date.now();
+    if (cached?.inFlight) {
+      return cached.inFlight;
+    }
+    if (cached && now - cached.fetchedAt < DEPOSIT_CACHE_TTL_MS) {
+      return cached.rows;
+    }
+
+    const inFlight = this.requestDepositRecords(connection);
+    connection.depositCache = {
+      fetchedAt: 0,
+      rows: cached?.rows ?? [],
+      historyScanned: cached?.historyScanned ?? false,
+      inFlight,
+    };
+
+    try {
+      const rows = await inFlight;
+      connection.depositCache = {
+        fetchedAt: Date.now(),
+        rows,
+        historyScanned: true,
+      };
+      return rows;
+    } catch (err) {
+      connection.depositCache = cached
+        ? {
+            fetchedAt: cached.fetchedAt,
+            rows: cached.rows,
+            historyScanned: cached.historyScanned,
+          }
+        : undefined;
+      throw err;
+    }
+  }
+
+  private async requestDepositRecords(
+    connection: Connection,
+  ): Promise<DepositRow[]> {
+    const previous = connection.depositCache?.rows ?? [];
+    const historyScanned = connection.depositCache?.historyScanned ?? false;
+    const now = Date.now();
+
+    if (!historyScanned) {
+      const rows = await fetchAcrossTimeWindows(
+        (window) => this.fetchDepositWindow(connection, window),
+        now,
+        DEPOSIT_LOOKBACK_MS,
+        DEPOSIT_WINDOW_MS,
+      );
+      return dedupeByKey(rows, (row) => row.txID ?? '');
+    }
+
+    const recent = await this.fetchDepositWindow(connection, {
+      startTime: now - DEPOSIT_WINDOW_MS,
+      endTime: now,
+    });
+    return dedupeByKey([...recent, ...previous], (row) => row.txID ?? '');
+  }
+
+  private async fetchDepositWindow(
+    connection: Connection,
+    window: TimeWindow,
+  ): Promise<DepositRow[]> {
+    return fetchAllCursorPages(async (cursor) => {
+      const result = await connection.client.get<{
+        rows?: DepositRow[];
+        nextPageCursor?: string;
+      }>('/v5/asset/deposit/query-record', {
+        limit: 50,
+        startTime: window.startTime,
+        endTime: window.endTime,
+        cursor,
+      });
+      return {
+        items: result.rows ?? [],
+        nextPageCursor: result.nextPageCursor,
+      };
+    });
+  }
+
+  private async loadConvertHistory(
+    connection: Connection,
+    accountType: string,
+  ): Promise<
+    Array<{
+      exchangeTxId?: string;
+      fromCoin?: string;
+      toCoin?: string;
+      fromAmount?: string;
+      toAmount?: string;
+      exchangeStatus?: string;
+      createdAt?: string;
+      accountType?: string;
+    }>
+  > {
+    type ConvertRow = {
+      exchangeTxId?: string;
+      fromCoin?: string;
+      toCoin?: string;
+      fromAmount?: string;
+      toAmount?: string;
+      exchangeStatus?: string;
+      createdAt?: string;
+      accountType?: string;
+    };
+
+    const all: ConvertRow[] = [];
+    const limit = 100;
+    for (let index = 1; index <= 50; index++) {
+      const result = await connection.client.get<{
+        list?: ConvertRow[];
+      }>('/v5/asset/exchange/query-convert-history', {
+        accountType,
+        limit,
+        index,
+      });
+      const page = result.list ?? [];
+      all.push(...page);
+      if (page.length < limit) break;
+    }
+    return dedupeByKey(all, (row) => row.exchangeTxId ?? '');
   }
 
   /** Fill missing deposit USD costs from hourly candles near the deposit time. */
@@ -1463,6 +1645,10 @@ function estimateConvertFiatUsd(
   const toPx = priceCache.get(toCoin) ?? 0;
   if (toPx > 0 && toAmount > 0) return toAmount * toPx;
   return 0;
+}
+
+function spotExecKey(row: SpotExecutionRow): string {
+  return row.execId || row.orderId || '';
 }
 
 export function createBybitProvider(): BybitCryptoProvider {
