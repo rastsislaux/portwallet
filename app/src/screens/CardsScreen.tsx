@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatFiat, formatQty } from '../components/Amount';
 import { CardCarousel } from '../components/CardCarousel';
 import { CryptoIcon, IconRefresh } from '../components/icons';
@@ -210,6 +210,7 @@ function CardDetail({
   activityDegraded: boolean;
 }) {
   const { formatFromUsd } = useSettings();
+  const navigate = useNavigate();
   const eligibleFunding = funding.filter((f) => f.cardEligible);
 
   return (
@@ -257,7 +258,16 @@ function CardDetail({
         ) : (
           <div className="tx-list">
             {operations.map((op) => (
-              <div key={op.id} className="tx-row">
+              <div
+                key={op.id}
+                className="tx-row tx-row--clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/cards/op/${op.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') navigate(`/cards/op/${op.id}`);
+                }}
+              >
                 {op.assetSymbol ? (
                   <span className="tx-row__icon">
                     <CryptoIcon symbol={op.assetSymbol} size={32} decorative />
@@ -268,14 +278,9 @@ function CardDetail({
                   {op.merchant ? ` · ${op.merchant}` : ''}
                 </span>
                 <span className="tx-row__amount tabular">
-                  {signedFiat(op)}
+                  {signedFiatLocal(op)}
                 </span>
                 <span className="tx-row__meta">
-                  {op.providerLabel}
-                  {op.assetSymbol ? ` · ${op.assetSymbol}` : ''}
-                  {op.failureReason ? ` · ${op.failureReason}` : ''}
-                </span>
-                <span className="tx-row__status">
                   <StatusBadge status={op.status} />
                 </span>
               </div>
@@ -304,8 +309,19 @@ function labelCardKind(kind: CardOperation['kind']): string {
   }
 }
 
-function signedFiat(op: CardOperation): string {
-  const amount = formatFiat(op.amountFiat);
-  if (op.kind === 'refund' || op.kind === 'top_up') return `+${amount}`;
-  return `−${amount}`;
+function formatLocalAmount(value: number, currency: string): string {
+  const isWholeUnit = ['KZT', 'JPY', 'KRW', 'VND', 'CLP', 'ISK', 'HUF'].includes(currency);
+  if (isWholeUnit) {
+    return Math.round(value).toLocaleString('en-US');
+  }
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function signedFiatLocal(op: CardOperation): string {
+  const amount = formatLocalAmount(op.amountFiat, op.currency);
+  const sign = op.kind === 'refund' || op.kind === 'top_up' ? '+' : '−';
+  return `${sign}${amount} ${op.currency}`;
 }

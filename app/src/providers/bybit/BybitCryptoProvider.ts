@@ -999,6 +999,8 @@ export class BybitCryptoProvider implements CryptoProvider {
           merchant: row.merchName || 'Bybit Card',
           amountFiat: num(row.basicAmount || row.billAmount || row.paidAmount),
           currency: row.basicCurrency || row.paidCurrency || 'USD',
+          amountTokenValue: num(row.paidAmount || row.transactionCurrencyAmount) || undefined,
+          tokenSymbol: row.paidCurrency || undefined,
           assetSymbol: row.paidCurrency || undefined,
           quantity: num(row.paidAmount || row.transactionCurrencyAmount),
           createdAt: toIso(row.txnCreate),
