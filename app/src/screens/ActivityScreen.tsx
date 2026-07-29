@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatQty } from '../components/Amount';
 import { CryptoIcon } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
@@ -71,6 +72,8 @@ export function ActivityScreen() {
 }
 
 function TxList({ items }: { items: ReturnType<typeof useWallet>['transactions'] }) {
+  const navigate = useNavigate();
+
   return (
     <div className="tx-list">
       {items.map((tx) => {
@@ -80,9 +83,19 @@ function TxList({ items }: { items: ReturnType<typeof useWallet>['transactions']
             : `${labelKind(tx.kind)} · ${tx.assetSymbol}`;
         const signed =
           tx.kind === 'deposit' ? `+${formatQty(tx.quantity)}` : `−${formatQty(tx.quantity)}`;
+        const open = () => navigate(`/activity/${encodeURIComponent(tx.id)}`);
 
         return (
-          <div key={tx.id} className="tx-row">
+          <div
+            key={tx.id}
+            className="tx-row tx-row--clickable"
+            role="button"
+            tabIndex={0}
+            onClick={open}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') open();
+            }}
+          >
             <span className="tx-row__icon">
               <CryptoIcon symbol={tx.assetSymbol} size={32} decorative />
             </span>
