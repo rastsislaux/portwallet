@@ -4,7 +4,6 @@ import type {
   BybitServerId,
   CardCapability,
   CardOperation,
-  CardOperationKind,
   ConnectConfig,
   CustodyKind,
   ExchangeQuote,
@@ -29,6 +28,7 @@ import {
   BybitRestClient,
   isBybitRateLimitError,
 } from './client';
+import { mapBybitCardAssetRecord } from './cardOperations';
 import {
   assertCan,
   parseBybitPermissions,
@@ -65,6 +65,8 @@ type CardAssetRecord = {
   orderNo?: string;
   txnCreate?: number | string;
   declinedReason?: string;
+  totalFees?: string;
+  foreignTransactionFee?: string;
 };
 
 type CardRecordsCache = {
@@ -146,19 +148,6 @@ function productLabel(product: WalletProduct): string {
 
 function convertAccountType(product: Exclude<WalletProduct, 'EARN'>): string {
   return product === 'UNIFIED' ? 'eb_convert_uta' : 'eb_convert_funding';
-}
-
-function mapCardSide(side: string): CardOperationKind {
-  if (side === '5' || side === '4' || side === '8' || side === '10') return 'refund';
-  if (side === '13') return 'atm';
-  if (side === '12') return 'fee';
-  return 'purchase';
-}
-
-function mapCardStatus(status: string, tradeStatus: string): OperationStatus {
-  if (status === '2' || tradeStatus === '2') return 'failed';
-  if (status === '0' || status === '-1' || tradeStatus === '0') return 'pending';
-  return 'completed';
 }
 
 function sumEligibleFunding(funding: FundingAssetBalance[]): {
@@ -992,45 +981,13 @@ export class BybitCryptoProvider implements CryptoProvider {
 
     const records = await this.fetchCardRecords(connection, panFilter);
     return records
-      .map((row) => {
-        const pan4 = row.pan4 || '····';
-        // Merchant / local payment (e.g. 1490 KZT). Prefer transaction* over
-        // basic* — basicAmount/basicCurrency is card-network settlement (often USD).
-        const merchantAmount = num(
-          row.transactionAmount || row.transactionCurrencyAmount || row.basicAmount,
-        );
-        const merchantCurrency =
-          row.transactionCurrency || row.basicCurrency || 'USD';
-        // Crypto actually deducted from the funding wallet.
-        const tokenAmount = num(row.paidAmount);
-        const tokenSymbol = row.paidCurrency || undefined;
-        // Mastercard / Visa bill in card billing currency.
-        const settlementAmount = num(row.billAmount || row.basicAmount);
-        const settlementCurrency = row.basicCurrency || undefined;
-
-        return {
-          id: row.txnId || row.orderNo || nextId('cardop'),
-          cardId: `${accountId}_card_${pan4}`,
+      .map((row) =>
+        mapBybitCardAssetRecord(row, {
           accountId,
-          kind: mapCardSide(row.side ?? '3'),
-          status: mapCardStatus(row.status ?? '1', row.tradeStatus ?? '1'),
-          merchant: row.merchName || 'Bybit Card',
-          amountFiat: merchantAmount,
-          currency: merchantCurrency,
-          amountTokenValue: tokenAmount > 0 ? tokenAmount : undefined,
-          tokenSymbol,
-          settlementAmount: settlementAmount > 0 ? settlementAmount : undefined,
-          settlementCurrency,
-          assetSymbol: tokenSymbol,
-          quantity: tokenAmount > 0 ? tokenAmount : undefined,
-          createdAt: toIso(row.txnCreate),
           providerLabel: session.account.nickname,
-          failureReason: row.declinedReason || undefined,
-          cardLastFour: pan4,
-          merchantCity: row.merchCity || undefined,
-          merchantCountry: row.merchCountry || undefined,
-        } satisfies CardOperation;
-      })
+          fallbackId: nextId('cardop'),
+        }),
+      )
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }
 

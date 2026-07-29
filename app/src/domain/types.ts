@@ -247,15 +247,29 @@ export interface CardOperation {
   kind: CardOperationKind;
   status: OperationStatus;
   merchant: string;
-  /** Original merchant / local payment amount (e.g. 1490 KZT). */
+  /**
+   * Amount deducted from the user's funding balance — list primary.
+   * Bybit: `paidAmount` + `paidCurrency` (e.g. 1490 KZT or 3.19 USDT).
+   */
   amountFiat: number;
   currency: string;
-  /** Crypto/token actually charged (e.g. 3.19 USDT). */
-  amountTokenValue?: number;
-  tokenSymbol?: string;
-  /** Card-network settlement / bill amount (e.g. 3.19 USD). */
+  /**
+   * Card-network / merchant transaction amount.
+   * Bybit: `transactionAmount` + `transactionCurrency` (e.g. 3.13 USD).
+   */
+  cardAmount?: number;
+  cardCurrency?: string;
+  /**
+   * Total including fees.
+   * Bybit: `basicAmount` + `basicCurrency` (e.g. 3.19 USD).
+   */
   settlementAmount?: number;
   settlementCurrency?: string;
+  feeAmount?: number;
+  feeCurrency?: string;
+  /** Present when funding currency is crypto (USDT/USDC/…). */
+  amountTokenValue?: number;
+  tokenSymbol?: string;
   assetSymbol?: string;
   quantity?: number;
   createdAt: string;
