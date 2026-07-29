@@ -274,7 +274,7 @@ function CardDetail({
                 }}
               >
                 <span className="tx-row__icon tx-row__icon--kind" aria-hidden="true">
-                  <CardKindIcon kind={op.kind} size={18} />
+                  <CardKindIcon kind={op.kind} size={16} />
                 </span>
                 <span className="tx-row__title">{op.merchant || labelCardKind(op.kind)}</span>
                 <span className="tx-row__amount tabular">{signedFiatLocal(op)}</span>
