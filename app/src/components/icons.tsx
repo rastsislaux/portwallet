@@ -18,7 +18,9 @@ import {
   Repeat2,
   RotateCcw,
   Settings,
+  Share,
   ShoppingBag,
+  SquarePlus,
   WalletCards,
   X,
   type LucideProps,
@@ -54,6 +56,8 @@ export const IconCopy = withDefaults(Copy);
 export const IconBack = withDefaults(ArrowLeft);
 export const IconCheck = withDefaults(Check);
 export const IconDownload = withDefaults(Download);
+export const IconShare = withDefaults(Share);
+export const IconPlusSquare = withDefaults(SquarePlus);
 export const IconX = withDefaults(X);
 export const IconPurchase = withDefaults(ShoppingBag);
 export const IconRefund = withDefaults(RotateCcw);

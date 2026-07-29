@@ -1,10 +1,12 @@
+import { useNavigate } from 'react-router-dom';
 import { IconDownload, IconX } from './icons';
 import { usePwaInstall } from '../state/PwaInstallContext';
 
 export function PwaInstallBanner() {
+  const navigate = useNavigate();
   const {
     showInstallButton,
-    installHint,
+    canPrompt,
     promptInstall,
     hideInstallButton,
   } = usePwaInstall();
@@ -17,7 +19,7 @@ export function PwaInstallBanner() {
         <div className="pwa-install__copy">
           <div className="pwa-install__title">Install Portwallet</div>
           <p className="pwa-install__meta">
-            {installHint ?? 'Add to your home screen for quick access'}
+            Add to your home screen for quick access
           </p>
         </div>
         <div className="pwa-install__actions">
@@ -25,7 +27,11 @@ export function PwaInstallBanner() {
             type="button"
             className="btn btn--soft pwa-install__cta"
             onClick={() => {
-              void promptInstall();
+              if (canPrompt) {
+                void promptInstall();
+                return;
+              }
+              navigate('/install');
             }}
           >
             <IconDownload size={16} strokeWidth={2.25} />

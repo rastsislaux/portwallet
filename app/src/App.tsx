@@ -8,6 +8,7 @@ import { CardOperationDetailScreen } from './screens/CardOperationDetailScreen';
 import { CardsScreen } from './screens/CardsScreen';
 import { ExchangeScreen } from './screens/ExchangeScreen';
 import { HomeScreen } from './screens/HomeScreen';
+import { InstallGuideScreen } from './screens/InstallGuideScreen';
 import { ReceiveScreen } from './screens/ReceiveScreen';
 import { SendScreen } from './screens/SendScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -37,6 +38,7 @@ export default function App() {
                 <Route path="cards/op/:operationId" element={<CardOperationDetailScreen />} />
                 <Route path="exchange" element={<ExchangeScreen />} />
                 <Route path="settings" element={<SettingsScreen />} />
+                <Route path="install" element={<InstallGuideScreen />} />
                 <Route path="accounts" element={<AccountsScreen />} />
                 <Route path="asset/:assetId" element={<AssetDetailScreen />} />
                 <Route path="send" element={<SendScreen />} />
