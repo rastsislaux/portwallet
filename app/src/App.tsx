@@ -12,6 +12,7 @@ import { InstallGuideScreen } from './screens/InstallGuideScreen';
 import { ReceiveScreen } from './screens/ReceiveScreen';
 import { SendScreen } from './screens/SendScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { TransactionDetailScreen } from './screens/TransactionDetailScreen';
 import { PwaInstallProvider } from './state/PwaInstallContext';
 import { SettingsProvider } from './state/SettingsContext';
 import { WalletProvider } from './state/WalletContext';
@@ -34,6 +35,7 @@ export default function App() {
               <Route element={<AppShell />}>
                 <Route index element={<HomeScreen />} />
                 <Route path="activity" element={<ActivityScreen />} />
+                <Route path="activity/:transactionId" element={<TransactionDetailScreen />} />
                 <Route path="cards" element={<CardsScreen />} />
                 <Route path="cards/op/:operationId" element={<CardOperationDetailScreen />} />
                 <Route path="exchange" element={<ExchangeScreen />} />
