@@ -12,7 +12,7 @@ export function CardsScreen() {
   const {
     ready,
     accounts,
-    cards,
+    cards: allCards,
     cardOperations,
     accountCardStatuses,
     fundingByAccountId,
@@ -20,6 +20,11 @@ export function CardsScreen() {
     refresh,
     isRefreshing,
   } = useWallet();
+  const { hiddenCardIds } = useSettings();
+  const cards = useMemo(
+    () => allCards.filter((c) => !hiddenCardIds.has(c.id)),
+    [allCards, hiddenCardIds],
+  );
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   useEffect(() => {
