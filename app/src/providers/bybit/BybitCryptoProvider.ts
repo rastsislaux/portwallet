@@ -55,8 +55,12 @@ type CardAssetRecord = {
   paidAmount?: string;
   basicCurrency?: string;
   paidCurrency?: string;
+  transactionAmount?: string;
+  transactionCurrency?: string;
   transactionCurrencyAmount?: string;
   merchName?: string;
+  merchCity?: string;
+  merchCountry?: string;
   txnId?: string;
   orderNo?: string;
   txnCreate?: number | string;
@@ -990,6 +994,20 @@ export class BybitCryptoProvider implements CryptoProvider {
     return records
       .map((row) => {
         const pan4 = row.pan4 || '····';
+        // Merchant / local payment (e.g. 1490 KZT). Prefer transaction* over
+        // basic* — basicAmount/basicCurrency is card-network settlement (often USD).
+        const merchantAmount = num(
+          row.transactionAmount || row.transactionCurrencyAmount || row.basicAmount,
+        );
+        const merchantCurrency =
+          row.transactionCurrency || row.basicCurrency || 'USD';
+        // Crypto actually deducted from the funding wallet.
+        const tokenAmount = num(row.paidAmount);
+        const tokenSymbol = row.paidCurrency || undefined;
+        // Mastercard / Visa bill in card billing currency.
+        const settlementAmount = num(row.billAmount || row.basicAmount);
+        const settlementCurrency = row.basicCurrency || undefined;
+
         return {
           id: row.txnId || row.orderNo || nextId('cardop'),
           cardId: `${accountId}_card_${pan4}`,
@@ -997,15 +1015,20 @@ export class BybitCryptoProvider implements CryptoProvider {
           kind: mapCardSide(row.side ?? '3'),
           status: mapCardStatus(row.status ?? '1', row.tradeStatus ?? '1'),
           merchant: row.merchName || 'Bybit Card',
-          amountFiat: num(row.basicAmount || row.billAmount || row.paidAmount),
-          currency: row.basicCurrency || row.paidCurrency || 'USD',
-          amountTokenValue: num(row.paidAmount || row.transactionCurrencyAmount) || undefined,
-          tokenSymbol: row.paidCurrency || undefined,
-          assetSymbol: row.paidCurrency || undefined,
-          quantity: num(row.paidAmount || row.transactionCurrencyAmount),
+          amountFiat: merchantAmount,
+          currency: merchantCurrency,
+          amountTokenValue: tokenAmount > 0 ? tokenAmount : undefined,
+          tokenSymbol,
+          settlementAmount: settlementAmount > 0 ? settlementAmount : undefined,
+          settlementCurrency,
+          assetSymbol: tokenSymbol,
+          quantity: tokenAmount > 0 ? tokenAmount : undefined,
           createdAt: toIso(row.txnCreate),
           providerLabel: session.account.nickname,
           failureReason: row.declinedReason || undefined,
+          cardLastFour: pan4,
+          merchantCity: row.merchCity || undefined,
+          merchantCountry: row.merchCountry || undefined,
         } satisfies CardOperation;
       })
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
