@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatAssetQty, formatQty } from '../components/Amount';
-import { CryptoIcon, IconBack, IconChevronDown } from '../components/icons';
+import {
+  assetChoiceOptions,
+  ChoiceScreen,
+  ChoiceTrigger,
+  networkChoiceOptions,
+} from '../components/ChoiceScreen';
+import { CryptoIcon, IconBack } from '../components/icons';
 import { balanceQuantity, isInsufficientBalance } from '../domain/balances';
 import type {
   OperationResult,
@@ -12,6 +18,7 @@ import type {
 import { useWallet } from '../state/WalletContext';
 
 type Step = 'form' | 'review' | 'result';
+type Picker = 'asset' | 'network' | null;
 
 export function SendScreen() {
   const navigate = useNavigate();
@@ -19,17 +26,23 @@ export function SendScreen() {
   const {
     accounts,
     balances,
+    assets,
     prepareSend,
     submitSend,
     listNetworks,
   } = useWallet();
 
+  const assetOptions = useMemo(
+    () => assetChoiceOptions(balances, assets),
+    [balances, assets],
+  );
   const assetSymbols = useMemo(
-    () => [...new Set(balances.map((b) => b.symbol))],
-    [balances],
+    () => assetOptions.map((option) => option.id),
+    [assetOptions],
   );
 
   const [step, setStep] = useState<Step>('form');
+  const [picker, setPicker] = useState<Picker>(null);
   const [asset, setAsset] = useState(params.get('asset') ?? 'BTC');
   const [accountId, setAccountId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -38,12 +51,18 @@ export function SendScreen() {
   const [kind, setKind] = useState<
     Extract<TransactionKind, 'transfer' | 'internal' | 'withdrawal'>
   >('withdrawal');
-  const [networks, setNetworks] = useState<{ id: string; name: string }[]>([]);
+  const [networks, setNetworks] = useState<{ id: string; name: string; chain?: string }[]>([]);
   const [networkId, setNetworkId] = useState('');
   const [preview, setPreview] = useState<SendPreview | null>(null);
   const [result, setResult] = useState<OperationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const networkOptions = useMemo(
+    () => networkChoiceOptions(networks, asset),
+    [networks, asset],
+  );
+  const selectedNetwork = networks.find((n) => n.id === networkId);
 
   const accountOptions = useMemo(
     () =>
@@ -318,27 +337,12 @@ export function SendScreen() {
       </button>
       <h1 className="screen-title">Send</h1>
 
-      <div className="field">
-        <label htmlFor="send-asset">Asset</label>
-        <div className="asset-select">
-          <CryptoIcon symbol={asset} size={28} decorative />
-          <span className="asset-select__label">{asset}</span>
-          <span className="asset-select__chevron">
-            <IconChevronDown size={16} />
-          </span>
-          <select
-            id="send-asset"
-            value={asset}
-            onChange={(e) => setAsset(e.target.value)}
-          >
-            {assetSymbols.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <ChoiceTrigger
+        label="Asset"
+        valueLabel={asset}
+        iconSymbol={asset}
+        onClick={() => setPicker('asset')}
+      />
 
       <div className="field">
         <label htmlFor="send-account">From account</label>
@@ -397,20 +401,13 @@ export function SendScreen() {
       ) : (
         <>
           {kind === 'withdrawal' ? (
-            <div className="field">
-              <label htmlFor="send-network">Network</label>
-              <select
-                id="send-network"
-                value={networkId}
-                onChange={(e) => setNetworkId(e.target.value)}
-              >
-                {networks.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <ChoiceTrigger
+              label="Network"
+              valueLabel={selectedNetwork?.name ?? 'Select network'}
+              iconSymbol={asset}
+              disabled={networks.length === 0}
+              onClick={() => setPicker('network')}
+            />
           ) : null}
           <div className="field">
             <label htmlFor="send-dest">Destination</label>
@@ -487,6 +484,28 @@ export function SendScreen() {
       >
         Review
       </button>
+
+      {picker === 'asset' ? (
+        <ChoiceScreen
+          title="Select asset"
+          searchPlaceholder="Search assets"
+          options={assetOptions}
+          value={asset}
+          onSelect={setAsset}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
+
+      {picker === 'network' ? (
+        <ChoiceScreen
+          title="Select network"
+          searchPlaceholder="Search networks"
+          options={networkOptions}
+          value={networkId}
+          onSelect={setNetworkId}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
     </section>
   );
 }
