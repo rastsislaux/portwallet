@@ -9,6 +9,7 @@ import {
   ProviderIcon,
 } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
+import { exchangeRouteLabel } from '../domain/exchangeLegs';
 import { transactionAmountSign } from '../domain/transactionDirection';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
@@ -34,7 +35,11 @@ export function AssetDetailScreen() {
 
   const holdings = balances.filter((b) => b.assetId === asset.assetId);
   const recent = transactions
-    .filter((t) => t.assetSymbol === asset.symbol || t.counterAssetSymbol === asset.symbol)
+    .filter((t) =>
+      t.direction
+        ? t.assetSymbol === asset.symbol
+        : t.assetSymbol === asset.symbol || t.counterAssetSymbol === asset.symbol,
+    )
     .slice(0, 5);
   const showName = asset.name.trim().toUpperCase() !== asset.symbol.toUpperCase();
   const unitPriceUsd =
@@ -141,9 +146,7 @@ export function AssetDetailScreen() {
                   <CryptoIcon symbol={tx.assetSymbol} size={32} decorative />
                 </span>
                 <span className="tx-row__title">
-                  {tx.kind === 'exchange'
-                    ? `Exchange ${tx.assetSymbol}→${tx.counterAssetSymbol}`
-                    : `${capitalize(tx.kind)} · ${tx.assetSymbol}`}
+                  {exchangeRouteLabel(tx) ?? `${capitalize(tx.kind)} · ${tx.assetSymbol}`}
                 </span>
                 <span className="tx-row__amount tabular">
                   {transactionAmountSign(tx)}

@@ -4,6 +4,7 @@ import type { Transaction } from './types';
 export function isTransactionCredit(tx: Transaction): boolean {
   if (tx.kind === 'deposit') return true;
   if (tx.kind === 'internal' && tx.direction === 'in') return true;
+  if (tx.kind === 'exchange' && tx.direction === 'in') return true;
   return false;
 }
 

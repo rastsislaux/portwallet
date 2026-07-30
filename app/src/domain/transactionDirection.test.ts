@@ -39,7 +39,16 @@ describe('transactionDirection', () => {
     expect(transactionAmountSign(legacy)).toBe('−');
   });
 
-  it('treats withdrawals and exchanges as debits of the spent asset', () => {
+  it('treats exchange legs by direction', () => {
+    const out = tx({ kind: 'exchange', direction: 'out' });
+    const inn = tx({ kind: 'exchange', direction: 'in' });
+    expect(isTransactionCredit(out)).toBe(false);
+    expect(isTransactionCredit(inn)).toBe(true);
+    expect(transactionAmountSign(out)).toBe('−');
+    expect(transactionAmountSign(inn)).toBe('+');
+  });
+
+  it('treats withdrawals and legacy exchanges as debits of the spent asset', () => {
     expect(isTransactionCredit(tx({ kind: 'withdrawal' }))).toBe(false);
     expect(isTransactionCredit(tx({ kind: 'exchange' }))).toBe(false);
   });
