@@ -378,15 +378,11 @@ export function ExchangeScreen() {
               </div>
             ) : null}
           </>
-        ) : (
-          <div className="quote-status">
-            {quoting
-              ? 'Updating quote…'
-              : insufficientBalance
-                ? 'Amount exceeds available balance'
-                : error ?? 'Enter an amount to see your quote'}
-          </div>
-        )}
+        ) : quoting ? (
+          <div className="quote-status">Updating quote…</div>
+        ) : !error && !insufficientBalance ? (
+          <div className="quote-status">Enter an amount to see your quote</div>
+        ) : null}
       </div>
 
       {insufficientBalance ? (
