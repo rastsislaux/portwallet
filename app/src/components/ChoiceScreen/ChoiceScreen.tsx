@@ -35,6 +35,8 @@ export function ChoiceScreen({
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const filtered = useMemo(
     () => options.filter((option) => matchesQuery(option, query)),
@@ -48,7 +50,7 @@ export function ChoiceScreen({
       inputRef.current?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
@@ -56,7 +58,7 @@ export function ChoiceScreen({
       window.cancelAnimationFrame(frame);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   useEffect(() => {
     listRef.current?.scrollTo?.({ top: 0 });
