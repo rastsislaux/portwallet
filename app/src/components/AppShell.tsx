@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   IconCards,
   IconExchange,
@@ -13,7 +14,19 @@ const tabs = [
   { to: '/exchange', label: 'Exchange', end: false, icon: IconExchange },
 ] as const;
 
+const SCROLL_LOCK_PATHS = new Set(['/exchange']);
+
 export function AppShell() {
+  const { pathname } = useLocation();
+  const lockScroll = SCROLL_LOCK_PATHS.has(pathname);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('scroll-lock', lockScroll);
+    return () => {
+      document.documentElement.classList.remove('scroll-lock');
+    };
+  }, [lockScroll]);
+
   return (
     <div className="app-root">
       <div className="app-column">
