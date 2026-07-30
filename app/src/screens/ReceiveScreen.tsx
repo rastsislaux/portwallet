@@ -1,27 +1,39 @@
 import { useEffect, useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CryptoIcon, IconBack, IconChevronDown, IconCopy } from '../components/icons';
+import {
+  assetChoiceOptions,
+  ChoiceScreen,
+  ChoiceTrigger,
+  networkChoiceOptions,
+} from '../components/ChoiceScreen';
+import { CryptoIcon, IconBack, IconCopy } from '../components/icons';
 import type { ReceiveAddress } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
 type Step = 'select' | 'address';
+type Picker = 'asset' | 'network' | null;
 
 export function ReceiveScreen() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { accounts, balances, getReceiveAddress, listNetworks } = useWallet();
+  const { accounts, balances, assets, getReceiveAddress, listNetworks } = useWallet();
 
+  const assetOptions = useMemo(
+    () => assetChoiceOptions(balances, assets),
+    [balances, assets],
+  );
   const assetSymbols = useMemo(
-    () => [...new Set(balances.map((b) => b.symbol))],
-    [balances],
+    () => assetOptions.map((option) => option.id),
+    [assetOptions],
   );
 
   const preferredAsset = params.get('asset') ?? assetSymbols[0] ?? 'BTC';
   const [step, setStep] = useState<Step>('select');
+  const [picker, setPicker] = useState<Picker>(null);
   const [asset, setAsset] = useState(preferredAsset);
   const [accountId, setAccountId] = useState('');
-  const [networks, setNetworks] = useState<{ id: string; name: string }[]>([]);
+  const [networks, setNetworks] = useState<{ id: string; name: string; chain?: string }[]>([]);
   const [networkId, setNetworkId] = useState('');
   const [networksLoading, setNetworksLoading] = useState(false);
   const [receive, setReceive] = useState<ReceiveAddress | null>(null);
@@ -30,6 +42,11 @@ export function ReceiveScreen() {
   const [busy, setBusy] = useState(false);
 
   const networkLocked = networks.length === 1;
+  const networkOptions = useMemo(
+    () => networkChoiceOptions(networks, asset),
+    [networks, asset],
+  );
+  const selectedNetwork = networks.find((n) => n.id === networkId);
 
   const accountOptions = useMemo(
     () =>
@@ -189,34 +206,12 @@ export function ReceiveScreen() {
       </button>
       <h1 className="screen-title">Receive</h1>
 
-      <div className="field">
-        <label htmlFor="recv-asset">Asset</label>
-        <div className="asset-select">
-          <CryptoIcon symbol={asset} size={28} decorative />
-          <span className="asset-select__label">{asset}</span>
-          <span className="asset-select__chevron">
-            <IconChevronDown size={16} />
-          </span>
-          <select
-            id="recv-asset"
-            value={asset}
-            onChange={(e) => {
-              const next = e.target.value;
-              setAsset(next);
-              const nextAccount =
-                balances.find((b) => b.symbol === next)?.accountId ?? accountId;
-              setAccountId(nextAccount);
-              setError(null);
-            }}
-          >
-            {assetSymbols.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <ChoiceTrigger
+        label="Asset"
+        valueLabel={asset}
+        iconSymbol={asset}
+        onClick={() => setPicker('asset')}
+      />
 
       <div className="field">
         <label htmlFor="recv-account">Account</label>
@@ -237,24 +232,14 @@ export function ReceiveScreen() {
       </div>
 
       {networks.length > 0 || networksLoading ? (
-        <div className="field">
-          <label htmlFor="recv-network">Network</label>
-          <select
-            id="recv-network"
-            value={networkId}
-            disabled={networkLocked || networksLoading}
-            onChange={(e) => {
-              setNetworkId(e.target.value);
-              setError(null);
-            }}
-          >
-            {networks.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <ChoiceTrigger
+          label="Network"
+          valueLabel={selectedNetwork?.name ?? (networksLoading ? 'Loading…' : 'Select network')}
+          iconSymbol={asset}
+          disabled={networkLocked}
+          loading={networksLoading}
+          onClick={() => setPicker('network')}
+        />
       ) : null}
 
       {error ? <div className="notice notice--danger">{error}</div> : null}
@@ -269,6 +254,37 @@ export function ReceiveScreen() {
           {busy ? 'Loading…' : 'Continue'}
         </button>
       </div>
+
+      {picker === 'asset' ? (
+        <ChoiceScreen
+          title="Select asset"
+          searchPlaceholder="Search assets"
+          options={assetOptions}
+          value={asset}
+          onSelect={(next) => {
+            setAsset(next);
+            const nextAccount =
+              balances.find((b) => b.symbol === next)?.accountId ?? accountId;
+            setAccountId(nextAccount);
+            setError(null);
+          }}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
+
+      {picker === 'network' ? (
+        <ChoiceScreen
+          title="Select network"
+          searchPlaceholder="Search networks"
+          options={networkOptions}
+          value={networkId}
+          onSelect={(next) => {
+            setNetworkId(next);
+            setError(null);
+          }}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
     </section>
   );
 }

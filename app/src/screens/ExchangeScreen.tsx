@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatAssetQty, formatQty } from '../components/Amount';
 import {
-  CryptoIcon,
+  assetChoiceOptions,
+  ChoiceScreen,
+  ChoiceTrigger,
+} from '../components/ChoiceScreen';
+import {
   IconChevronDown,
   IconSwap,
   ProviderIcon,
@@ -12,22 +16,29 @@ import type { ExchangeQuote, OperationResult } from '../domain/types';
 import { useWallet } from '../state/WalletContext';
 
 type Step = 'form' | 'result';
+type Picker = 'from' | 'to' | null;
 
 export function ExchangeScreen() {
   const [params] = useSearchParams();
   const {
     accounts,
     balances,
+    assets,
     prepareExchange,
     submitExchange,
   } = useWallet();
 
+  const assetOptions = useMemo(
+    () => assetChoiceOptions(balances, assets),
+    [balances, assets],
+  );
   const assetSymbols = useMemo(
-    () => [...new Set(balances.map((b) => b.symbol))],
-    [balances],
+    () => assetOptions.map((option) => option.id),
+    [assetOptions],
   );
 
   const [step, setStep] = useState<Step>('form');
+  const [picker, setPicker] = useState<Picker>(null);
   const [fromSymbol, setFromSymbol] = useState(params.get('from') ?? 'BTC');
   const [toSymbol, setToSymbol] = useState('USDT');
   const [accountId, setAccountId] = useState('');
@@ -255,24 +266,13 @@ export function ExchangeScreen() {
         <div className="conversion-leg">
           <div className="conversion-leg__top">
             <span className="conversion-leg__hint">You pay</span>
-            <label className="selector">
-              <CryptoIcon symbol={fromSymbol} size={28} decorative />
-              <span className="selector__ticker">{fromSymbol}</span>
-              <span className="selector__chevron">
-                <IconChevronDown size={14} />
-              </span>
-              <select
-                aria-label="From asset"
-                value={fromSymbol}
-                onChange={(e) => setFromSymbol(e.target.value)}
-              >
-                {assetSymbols.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ChoiceTrigger
+              variant="pill"
+              aria-label="From asset"
+              valueLabel={fromSymbol}
+              iconSymbol={fromSymbol}
+              onClick={() => setPicker('from')}
+            />
           </div>
           <input
             className="conversion-leg__amount tabular"
@@ -315,24 +315,13 @@ export function ExchangeScreen() {
         <div className="conversion-leg">
           <div className="conversion-leg__top">
             <span className="conversion-leg__hint">You receive</span>
-            <label className="selector">
-              <CryptoIcon symbol={toSymbol} size={28} decorative />
-              <span className="selector__ticker">{toSymbol}</span>
-              <span className="selector__chevron">
-                <IconChevronDown size={14} />
-              </span>
-              <select
-                aria-label="To asset"
-                value={toSymbol}
-                onChange={(e) => setToSymbol(e.target.value)}
-              >
-                {assetSymbols.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ChoiceTrigger
+              variant="pill"
+              aria-label="To asset"
+              valueLabel={toSymbol}
+              iconSymbol={toSymbol}
+              onClick={() => setPicker('to')}
+            />
           </div>
           <div
             className={`conversion-leg__receive tabular ${quote ? '' : 'is-muted'}`}
@@ -421,6 +410,28 @@ export function ExchangeScreen() {
       >
         Confirm exchange
       </button>
+
+      {picker === 'from' ? (
+        <ChoiceScreen
+          title="You pay"
+          searchPlaceholder="Search assets"
+          options={assetOptions}
+          value={fromSymbol}
+          onSelect={setFromSymbol}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
+
+      {picker === 'to' ? (
+        <ChoiceScreen
+          title="You receive"
+          searchPlaceholder="Search assets"
+          options={assetOptions}
+          value={toSymbol}
+          onSelect={setToSymbol}
+          onClose={() => setPicker(null)}
+        />
+      ) : null}
     </section>
   );
 }

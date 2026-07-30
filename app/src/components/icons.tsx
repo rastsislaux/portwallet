@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Repeat2,
   RotateCcw,
+  Search,
   Settings,
   Share,
   ShoppingBag,
@@ -59,6 +60,7 @@ export const IconDownload = withDefaults(Download);
 export const IconShare = withDefaults(Share);
 export const IconPlusSquare = withDefaults(SquarePlus);
 export const IconX = withDefaults(X);
+export const IconSearch = withDefaults(Search);
 export const IconPurchase = withDefaults(ShoppingBag);
 export const IconRefund = withDefaults(RotateCcw);
 export const IconAtm = withDefaults(Banknote);
