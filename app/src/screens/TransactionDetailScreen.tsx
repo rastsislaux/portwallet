@@ -4,6 +4,7 @@ import { formatAssetQty } from '../components/Amount';
 import { CryptoIcon } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
 import { WALLET_PRODUCT_LABELS, type Transaction } from '../domain/types';
+import { isTransactionCredit, transactionAmountSign } from '../domain/transactionDirection';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -65,9 +66,8 @@ export function TransactionDetailScreen() {
     );
   }
 
-  const isCredit = tx.kind === 'deposit';
-  const sign = isCredit ? '+' : '−';
-  const formattedAmount = `${sign}${formatAssetQty(tx.assetSymbol, tx.quantity)} ${tx.assetSymbol}`;
+  const isCredit = isTransactionCredit(tx);
+  const formattedAmount = `${transactionAmountSign(tx)}${formatAssetQty(tx.assetSymbol, tx.quantity)} ${tx.assetSymbol}`;
   const typeLabel =
     tx.kind === 'exchange' && tx.counterAssetSymbol
       ? `Exchange ${tx.assetSymbol}→${tx.counterAssetSymbol}`
@@ -119,7 +119,7 @@ export function TransactionDetailScreen() {
           {tx.counterparty ? (
             <div className="op-detail__row">
               <span className="op-detail__label">
-                {tx.kind === 'deposit' ? 'From' : 'To'}
+                {tx.kind === 'internal' ? 'Route' : isCredit ? 'From' : 'To'}
               </span>
               <span className="op-detail__value op-detail__value--mono">{tx.counterparty}</span>
             </div>

@@ -55,6 +55,9 @@ import {
   type DepositHistoryRow,
 } from './historyStorage';
 import {
+  interTransferToTransaction,
+} from './interTransfers';
+import {
   spotExecutionToTransaction,
   type SpotExecutionRow,
 } from './spotExecutions';
@@ -508,30 +511,8 @@ export class BybitCryptoProvider implements CryptoProvider {
         }>('/v5/asset/transfer/query-inter-transfer-list', { limit: 50 });
 
         for (const row of transfers.list ?? []) {
-          const from = (row.fromAccountType ?? '').toUpperCase();
-          const to = (row.toAccountType ?? '').toUpperCase();
-          const involves =
-            from === product ||
-            to === product ||
-            (product === 'UNIFIED' && (from === 'UNIFIED' || to === 'UNIFIED')) ||
-            (product === 'FUND' && (from === 'FUND' || to === 'FUND'));
-          if (!involves) continue;
-
-          const st = (row.status ?? '').toUpperCase();
-          txs.push({
-            id: `${row.transferId || nextId('tx')}_${product}`,
-            accountId,
-            kind: 'internal',
-            status:
-              st === 'SUCCESS' ? 'completed' : st === 'FAILED' ? 'failed' : 'pending',
-            assetSymbol: (row.coin ?? '').toUpperCase(),
-            quantity: num(row.amount),
-            fiatValueUsd: 0,
-            counterparty: `${row.fromAccountType ?? '?'} → ${row.toAccountType ?? '?'}`,
-            createdAt: toIso(row.timestamp),
-            providerLabel: label,
-            product,
-          });
+          const mapped = interTransferToTransaction(row, accountId, label, product);
+          if (mapped) txs.push(mapped);
         }
       } catch {
         /* optional */
