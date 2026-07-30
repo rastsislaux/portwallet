@@ -2217,8 +2217,9 @@ html.scroll-lock .app-root {
 }
 
 .card-rail {
-  --card-rail-item: min(85%, 360px);
-  --card-rail-glow: 32px;
+  /* Match content column width: pad-screen margins + glow inset for unclipped shadow. */
+  --card-rail-glow: 20px;
+  --card-rail-item: calc(100% - 2 * var(--pad-screen) + 2 * var(--card-rail-glow));
   position: relative;
   display: flex;
   flex-direction: row;
@@ -2251,12 +2252,6 @@ html.scroll-lock .app-root {
 
 .card-rail__item + .card-rail__item {
   margin-left: calc(var(--space-3) - 2 * var(--card-rail-glow));
-}
-
-@media (max-width: 420px) {
-  .card-rail {
-    --card-rail-item: min(88%, 360px);
-  }
 }
 
 .card-carousel__controls {
@@ -2331,8 +2326,8 @@ html.scroll-lock .app-root {
   position: relative;
   width: 100%;
   aspect-ratio: 85.6 / 53.98;
-  border-radius: 18px;
-  padding: 18px 20px;
+  border-radius: 16px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -2427,9 +2422,9 @@ html.scroll-lock .app-root {
 .payment-card__mid {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   margin-top: auto;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .payment-card__number {
