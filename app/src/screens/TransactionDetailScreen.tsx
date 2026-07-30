@@ -4,6 +4,7 @@ import { formatAssetQty } from '../components/Amount';
 import { CryptoIcon } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
 import { WALLET_PRODUCT_LABELS, type Transaction } from '../domain/types';
+import { exchangeRouteLabel } from '../domain/exchangeLegs';
 import { isTransactionCredit, transactionAmountSign } from '../domain/transactionDirection';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
@@ -68,10 +69,7 @@ export function TransactionDetailScreen() {
 
   const isCredit = isTransactionCredit(tx);
   const formattedAmount = `${transactionAmountSign(tx)}${formatAssetQty(tx.assetSymbol, tx.quantity)} ${tx.assetSymbol}`;
-  const typeLabel =
-    tx.kind === 'exchange' && tx.counterAssetSymbol
-      ? `Exchange ${tx.assetSymbol}→${tx.counterAssetSymbol}`
-      : labelKind(tx.kind);
+  const typeLabel = exchangeRouteLabel(tx) ?? labelKind(tx.kind);
   const productLabel = tx.product ? WALLET_PRODUCT_LABELS[tx.product] : null;
 
   return (
@@ -109,7 +107,7 @@ export function TransactionDetailScreen() {
 
           {tx.kind === 'exchange' && tx.counterAssetSymbol != null && tx.counterQuantity != null ? (
             <div className="op-detail__row">
-              <span className="op-detail__label">Received</span>
+              <span className="op-detail__label">{isCredit ? 'Spent' : 'Received'}</span>
               <span className="op-detail__value tabular">
                 {formatAssetQty(tx.counterAssetSymbol, tx.counterQuantity)} {tx.counterAssetSymbol}
               </span>

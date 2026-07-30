@@ -39,13 +39,24 @@ export function acquisitionCostUsd(
     return { quantity: tx.quantity, costUsd: tx.fiatValueUsd };
   }
 
-  if (tx.kind === 'exchange' && (tx.counterAssetSymbol ?? '').toUpperCase() === target) {
-    const quantity = tx.counterQuantity ?? 0;
-    if (!(quantity > 0)) return null;
+  if (tx.kind === 'exchange') {
+    // Dual-entry credit leg: assetSymbol is what was acquired.
+    if (tx.direction === 'in' && tx.assetSymbol.toUpperCase() === target) {
+      if (!(tx.quantity > 0)) return null;
+      const costUsd = estimateExchangeAcquisitionCostUsd(tx);
+      if (!(costUsd > 0)) return null;
+      return { quantity: tx.quantity, costUsd };
+    }
 
-    const costUsd = estimateExchangeCostUsd(tx);
-    if (!(costUsd > 0)) return null;
-    return { quantity, costUsd };
+    // Legacy single-row: spent in assetSymbol, received in counter.
+    if (!tx.direction && (tx.counterAssetSymbol ?? '').toUpperCase() === target) {
+      const quantity = tx.counterQuantity ?? 0;
+      if (!(quantity > 0)) return null;
+
+      const costUsd = estimateExchangeCostUsd(tx);
+      if (!(costUsd > 0)) return null;
+      return { quantity, costUsd };
+    }
   }
 
   return null;
@@ -54,6 +65,19 @@ export function acquisitionCostUsd(
 function estimateExchangeCostUsd(tx: Transaction): number {
   if (tx.fiatValueUsd > 0) return tx.fiatValueUsd;
   if (isStablecoin(tx.assetSymbol) && tx.quantity > 0) return tx.quantity;
+  return 0;
+}
+
+/** Cost for a credit exchange leg (counter is what was spent). */
+function estimateExchangeAcquisitionCostUsd(tx: Transaction): number {
+  if (tx.fiatValueUsd > 0) return tx.fiatValueUsd;
+  if (
+    tx.counterAssetSymbol &&
+    isStablecoin(tx.counterAssetSymbol) &&
+    (tx.counterQuantity ?? 0) > 0
+  ) {
+    return tx.counterQuantity ?? 0;
+  }
   return 0;
 }
 

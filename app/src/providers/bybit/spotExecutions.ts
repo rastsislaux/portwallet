@@ -1,4 +1,5 @@
 import type { OperationStatus, Transaction, WalletProduct } from '../../domain/types';
+import { exchangeLegs } from '../../domain/exchangeLegs';
 
 const QUOTE_SUFFIXES = ['USDT', 'USDC', 'USD', 'EUR', 'BTC', 'ETH'] as const;
 const STABLE_QUOTES = new Set(['USDT', 'USDC', 'USD', 'EUR']);
@@ -49,66 +50,53 @@ function toIso(value: string | number | undefined): string {
 }
 
 /**
- * Map a Bybit spot fill into a Portwallet exchange transaction.
+ * Map a Bybit spot fill into debit + credit exchange legs.
  * Buy BTCUSDT → spent quote (USDT), received base (BTC).
  * Sell BTCUSDT → spent base (BTC), received quote (USDT).
  */
-export function spotExecutionToTransaction(
+export function spotExecutionToTransactions(
   row: SpotExecutionRow,
   accountId: string,
   providerLabel: string,
   product?: WalletProduct,
-): Transaction | null {
+): Transaction[] {
   const pair = (row.symbol ?? '').toUpperCase();
   const parts = splitSpotPair(pair);
-  if (!parts) return null;
+  if (!parts) return [];
 
   const side = (row.side ?? '').toLowerCase();
   const isBuy = side === 'buy';
   const isSell = side === 'sell';
-  if (!isBuy && !isSell) return null;
+  if (!isBuy && !isSell) return [];
 
   const baseQty = num(row.execQty);
   const execValue = num(row.execValue);
   const execPrice = num(row.execPrice);
   const quoteQty = execValue > 0 ? execValue : execPrice > 0 && baseQty > 0 ? execPrice * baseQty : 0;
-  if (!(baseQty > 0) || !(quoteQty > 0)) return null;
+  if (!(baseQty > 0) || !(quoteQty > 0)) return [];
 
   const execId = row.execId || row.orderId;
-  if (!execId) return null;
+  if (!execId) return [];
 
   const status: OperationStatus = 'completed';
   const fiatValueUsd = STABLE_QUOTES.has(parts.quote) ? quoteQty : 0;
 
-  if (isBuy) {
-    return {
-      id: `exec_${execId}`,
-      accountId,
-      kind: 'exchange',
-      status,
-      assetSymbol: parts.quote,
-      quantity: quoteQty,
-      fiatValueUsd,
-      counterAssetSymbol: parts.base,
-      counterQuantity: baseQty,
-      createdAt: toIso(row.execTime),
-      providerLabel,
-      product,
-    };
-  }
+  const fromSymbol = isBuy ? parts.quote : parts.base;
+  const fromQuantity = isBuy ? quoteQty : baseQty;
+  const toSymbol = isBuy ? parts.base : parts.quote;
+  const toQuantity = isBuy ? baseQty : quoteQty;
 
-  return {
-    id: `exec_${execId}`,
+  return exchangeLegs({
+    idBase: `exec_${execId}`,
     accountId,
-    kind: 'exchange',
-    status,
-    assetSymbol: parts.base,
-    quantity: baseQty,
-    fiatValueUsd,
-    counterAssetSymbol: parts.quote,
-    counterQuantity: quoteQty,
-    createdAt: toIso(row.execTime),
     providerLabel,
     product,
-  };
+    status,
+    fromSymbol,
+    fromQuantity,
+    toSymbol,
+    toQuantity,
+    fiatValueUsd,
+    createdAt: toIso(row.execTime),
+  });
 }

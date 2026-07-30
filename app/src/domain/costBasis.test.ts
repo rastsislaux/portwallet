@@ -19,6 +19,7 @@ function tx(partial: Partial<Transaction> & Pick<Transaction, 'kind' | 'assetSym
     fiatValueUsd: partial.fiatValueUsd ?? 0,
     counterAssetSymbol: partial.counterAssetSymbol,
     counterQuantity: partial.counterQuantity,
+    direction: partial.direction,
     createdAt: partial.createdAt ?? '2024-01-01T00:00:00.000Z',
     providerLabel: partial.providerLabel ?? 'Mock',
   };
@@ -131,6 +132,54 @@ describe('averagePurchasePrice', () => {
       'ETH',
     );
     expect(lot).toEqual({ quantity: 0.1, costUsd: 270 });
+  });
+
+  it('uses dual-entry credit legs for acquisition cost', () => {
+    const lot = acquisitionCostUsd(
+      tx({
+        kind: 'exchange',
+        direction: 'in',
+        assetSymbol: 'ETH',
+        quantity: 0.1,
+        fiatValueUsd: 270,
+        counterAssetSymbol: 'USDT',
+        counterQuantity: 270,
+      }),
+      'ETH',
+    );
+    expect(lot).toEqual({ quantity: 0.1, costUsd: 270 });
+  });
+
+  it('estimates dual-entry credit cost from stablecoin spent when fiat missing', () => {
+    const lot = acquisitionCostUsd(
+      tx({
+        kind: 'exchange',
+        direction: 'in',
+        assetSymbol: 'ETH',
+        quantity: 0.1,
+        fiatValueUsd: 0,
+        counterAssetSymbol: 'USDT',
+        counterQuantity: 270,
+      }),
+      'ETH',
+    );
+    expect(lot).toEqual({ quantity: 0.1, costUsd: 270 });
+  });
+
+  it('ignores dual-entry debit legs for acquisition', () => {
+    const lot = acquisitionCostUsd(
+      tx({
+        kind: 'exchange',
+        direction: 'out',
+        assetSymbol: 'USDT',
+        quantity: 270,
+        fiatValueUsd: 270,
+        counterAssetSymbol: 'ETH',
+        counterQuantity: 0.1,
+      }),
+      'ETH',
+    );
+    expect(lot).toBeNull();
   });
 });
 

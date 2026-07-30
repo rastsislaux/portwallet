@@ -1,4 +1,5 @@
 import type { CryptoProvider } from '../domain/CryptoProvider';
+import { exchangeLegs } from '../domain/exchangeLegs';
 import type {
   AssetBalance,
   CardCapability,
@@ -21,6 +22,30 @@ import type {
 
 let idSeq = 1;
 const nextId = (prefix: string) => `${prefix}_${idSeq++}`;
+
+function seedExchangeLegs(input: {
+  idBase: string;
+  fromSymbol: string;
+  fromQuantity: number;
+  toSymbol: string;
+  toQuantity: number;
+  fiatValueUsd: number;
+  createdAt: string;
+  status?: Transaction['status'];
+}): Omit<Transaction, 'accountId' | 'providerLabel'>[] {
+  return exchangeLegs({
+    idBase: input.idBase,
+    accountId: '',
+    providerLabel: '',
+    status: input.status ?? 'completed',
+    fromSymbol: input.fromSymbol,
+    fromQuantity: input.fromQuantity,
+    toSymbol: input.toSymbol,
+    toQuantity: input.toQuantity,
+    fiatValueUsd: input.fiatValueUsd,
+    createdAt: input.createdAt,
+  }).map(({ accountId: _a, providerLabel: _p, ...rest }) => rest);
+}
 
 const NETWORKS: NetworkInfo[] = [
   { id: 'btc', name: 'Bitcoin', assetSymbol: 'BTC' },
@@ -155,17 +180,16 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
       },
     ],
     transactions: [
-      {
-        id: nextId('tx'),
-        kind: 'exchange',
-        status: 'pending',
-        assetSymbol: 'BTC',
-        quantity: 0.01,
+      ...seedExchangeLegs({
+        idBase: 'seed_pending_btc',
+        fromSymbol: 'BTC',
+        fromQuantity: 0.01,
+        toSymbol: 'USDT',
+        toQuantity: 682.15,
         fiatValueUsd: usdNotional('BTC', 0.01),
-        counterAssetSymbol: 'USDT',
-        counterQuantity: 682.15,
         createdAt: new Date(Date.now() - 120000).toISOString(),
-      },
+        status: 'pending',
+      }),
       {
         id: nextId('tx'),
         kind: 'withdrawal',
@@ -188,39 +212,33 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
         counterparty: 'FUND → UNIFIED',
         createdAt: new Date(Date.now() - 86400000).toISOString(),
       },
-      {
-        id: nextId('tx'),
-        kind: 'exchange',
-        status: 'completed',
-        assetSymbol: 'USDT',
-        quantity: 2500 * skew,
+      ...seedExchangeLegs({
+        idBase: 'seed_btc_14d',
+        fromSymbol: 'USDT',
+        fromQuantity: 2500 * skew,
+        toSymbol: 'BTC',
+        toQuantity: 0.05 * skew,
         fiatValueUsd: 2500 * skew,
-        counterAssetSymbol: 'BTC',
-        counterQuantity: 0.05 * skew,
         createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
-      },
-      {
-        id: nextId('tx'),
-        kind: 'exchange',
-        status: 'completed',
-        assetSymbol: 'USDT',
-        quantity: 3000 * skew,
+      }),
+      ...seedExchangeLegs({
+        idBase: 'seed_btc_4d',
+        fromSymbol: 'USDT',
+        fromQuantity: 3000 * skew,
+        toSymbol: 'BTC',
+        toQuantity: 0.05 * skew,
         fiatValueUsd: 3000 * skew,
-        counterAssetSymbol: 'BTC',
-        counterQuantity: 0.05 * skew,
         createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-      },
-      {
-        id: nextId('tx'),
-        kind: 'exchange',
-        status: 'completed',
-        assetSymbol: 'USDT',
-        quantity: 2000 * skew,
+      }),
+      ...seedExchangeLegs({
+        idBase: 'seed_eth_7d',
+        fromSymbol: 'USDT',
+        fromQuantity: 2000 * skew,
+        toSymbol: 'ETH',
+        toQuantity: 1.1 * skew,
         fiatValueUsd: 2000 * skew,
-        counterAssetSymbol: 'ETH',
-        counterQuantity: 1.1 * skew,
         createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-      },
+      }),
       {
         id: nextId('tx'),
         kind: 'deposit',
@@ -778,22 +796,21 @@ export class MockCryptoProvider implements CryptoProvider {
       };
     }
 
-    const tx: Transaction = {
-      id: nextId('tx'),
+    const legs = exchangeLegs({
+      idBase: nextId('tx'),
       accountId: quote.request.accountId,
-      kind: 'exchange',
-      status: 'completed',
-      assetSymbol: quote.request.fromSymbol,
-      quantity: quote.request.fromQuantity,
-      fiatValueUsd: usdNotional(quote.request.fromSymbol, quote.request.fromQuantity),
-      counterAssetSymbol: quote.request.toSymbol,
-      counterQuantity: quote.youReceiveQuantity,
-      createdAt: new Date().toISOString(),
       providerLabel: quote.providerLabel,
-    };
+      status: 'completed',
+      fromSymbol: quote.request.fromSymbol,
+      fromQuantity: quote.request.fromQuantity,
+      toSymbol: quote.request.toSymbol,
+      toQuantity: quote.youReceiveQuantity,
+      fiatValueUsd: usdNotional(quote.request.fromSymbol, quote.request.fromQuantity),
+      createdAt: new Date().toISOString(),
+    });
 
     const list = this.transactions.get(quote.request.accountId) ?? [];
-    list.unshift(tx);
+    list.unshift(...legs);
     this.transactions.set(quote.request.accountId, list);
 
     return {
@@ -802,7 +819,7 @@ export class MockCryptoProvider implements CryptoProvider {
       message: `Exchanged to ${quote.youReceiveQuantity.toLocaleString('en-US', {
         maximumFractionDigits: 8,
       })} ${quote.request.toSymbol}.`,
-      transactionId: tx.id,
+      transactionId: legs[0]?.id,
     };
   }
 }

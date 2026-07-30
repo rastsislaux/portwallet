@@ -116,8 +116,8 @@ export interface Transaction {
   providerLabel: string;
   product?: WalletProduct;
   /**
-   * For internal transfers listed on both Funding and UTA: `out` on the
-   * sender product, `in` on the receiver. Quantity stays absolute.
+   * For internal transfers and exchange legs: `out` on the debit side,
+   * `in` on the credit side. Quantity stays absolute.
    */
   direction?: TransactionDirection;
 }

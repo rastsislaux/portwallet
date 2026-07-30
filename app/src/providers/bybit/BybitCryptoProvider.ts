@@ -54,11 +54,12 @@ import {
   type ConvertHistoryRow,
   type DepositHistoryRow,
 } from './historyStorage';
+import { convertToTransactions } from './convertExchange';
 import {
   interTransferToTransaction,
 } from './interTransfers';
 import {
-  spotExecutionToTransaction,
+  spotExecutionToTransactions,
   type SpotExecutionRow,
 } from './spotExecutions';
 
@@ -536,36 +537,21 @@ export class BybitCryptoProvider implements CryptoProvider {
         }
 
         for (const row of forProduct) {
-          const st = (row.exchangeStatus ?? '').toLowerCase();
-          const fromCoin = (row.fromCoin ?? '').toUpperCase();
-          const toCoin = (row.toCoin ?? '').toUpperCase();
-          const fromAmount = num(row.fromAmount);
-          const toAmount = num(row.toAmount);
-          txs.push({
-            id: `${row.exchangeTxId || nextId('tx')}_${product}`,
+          const legs = convertToTransactions(
+            row,
             accountId,
-            kind: 'exchange',
-            status:
-              st.includes('success') || st === 'init_ok'
-                ? 'completed'
-                : st.includes('fail')
-                  ? 'failed'
-                  : 'pending',
-            assetSymbol: fromCoin,
-            quantity: fromAmount,
-            fiatValueUsd: estimateConvertFiatUsd(
-              fromCoin,
-              toCoin,
-              fromAmount,
-              toAmount,
-              connection.priceCache,
-            ),
-            counterAssetSymbol: toCoin,
-            counterQuantity: toAmount,
-            createdAt: toIso(row.createdAt),
-            providerLabel: label,
+            label,
             product,
-          });
+            (fromCoin, toCoin, fromAmount, toAmount) =>
+              estimateConvertFiatUsd(
+                fromCoin,
+                toCoin,
+                fromAmount,
+                toAmount,
+                connection.priceCache,
+              ),
+          );
+          txs.push(...legs);
         }
       } catch {
         /* optional */
@@ -576,8 +562,7 @@ export class BybitCryptoProvider implements CryptoProvider {
       try {
         const rows = await this.loadSpotExecutions(connection);
         for (const row of rows) {
-          const tx = spotExecutionToTransaction(row, accountId, label, product);
-          if (tx) txs.push(tx);
+          txs.push(...spotExecutionToTransactions(row, accountId, label, product));
         }
       } catch {
         /* optional — trading history may be permission-gated */
