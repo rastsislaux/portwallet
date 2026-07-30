@@ -4,6 +4,7 @@ import { formatQty } from '../components/Amount';
 import { CryptoIcon } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
 import type { OperationStatus } from '../domain/types';
+import { transactionAmountSign } from '../domain/transactionDirection';
 import { useWallet } from '../state/WalletContext';
 
 type Filter = 'all' | OperationStatus;
@@ -81,8 +82,7 @@ function TxList({ items }: { items: ReturnType<typeof useWallet>['transactions']
           tx.kind === 'exchange'
             ? `Exchange ${tx.assetSymbol}→${tx.counterAssetSymbol}`
             : `${labelKind(tx.kind)} · ${tx.assetSymbol}`;
-        const signed =
-          tx.kind === 'deposit' ? `+${formatQty(tx.quantity)}` : `−${formatQty(tx.quantity)}`;
+        const signed = `${transactionAmountSign(tx)}${formatQty(tx.quantity)}`;
         const open = () => navigate(`/activity/${encodeURIComponent(tx.id)}`);
 
         return (

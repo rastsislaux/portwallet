@@ -9,6 +9,7 @@ import {
   ProviderIcon,
 } from '../components/icons';
 import { StatusBadge } from '../components/StatusBadge';
+import { transactionAmountSign } from '../domain/transactionDirection';
 import { useSettings } from '../state/SettingsContext';
 import { useWallet } from '../state/WalletContext';
 
@@ -145,7 +146,7 @@ export function AssetDetailScreen() {
                     : `${capitalize(tx.kind)} · ${tx.assetSymbol}`}
                 </span>
                 <span className="tx-row__amount tabular">
-                  {tx.kind === 'deposit' || tx.kind === 'internal' ? '+' : '−'}
+                  {transactionAmountSign(tx)}
                   {formatQty(tx.quantity)}
                 </span>
                 <span className="tx-row__meta">

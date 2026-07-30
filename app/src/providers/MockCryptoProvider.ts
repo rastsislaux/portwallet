@@ -184,6 +184,8 @@ function seedFor(type: ProviderType, instanceIndex: number): InstanceSeed {
         assetSymbol: 'USDT',
         quantity: 200,
         fiatValueUsd: 200,
+        direction: 'out',
+        counterparty: 'FUND → UNIFIED',
         createdAt: new Date(Date.now() - 86400000).toISOString(),
       },
       {
@@ -676,6 +678,7 @@ export class MockCryptoProvider implements CryptoProvider {
       createdAt: new Date().toISOString(),
       providerLabel:
         this.accounts.get(preview.request.accountId)?.nickname ?? this.venueLabel,
+      direction: preview.request.kind === 'internal' ? 'out' : undefined,
     };
 
     const list = this.transactions.get(preview.request.accountId) ?? [];

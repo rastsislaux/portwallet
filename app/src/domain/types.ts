@@ -11,6 +11,9 @@ export type TransactionKind =
   | 'deposit'
   | 'exchange';
 
+/** Inflow/outflow relative to the account that owns the row. */
+export type TransactionDirection = 'in' | 'out';
+
 /** Bybit wallet buckets (and future venue analogues). */
 export type WalletProduct = 'FUND' | 'UNIFIED' | 'EARN';
 
@@ -112,6 +115,11 @@ export interface Transaction {
   failureReason?: string;
   providerLabel: string;
   product?: WalletProduct;
+  /**
+   * For internal transfers listed on both Funding and UTA: `out` on the
+   * sender product, `in` on the receiver. Quantity stays absolute.
+   */
+  direction?: TransactionDirection;
 }
 
 export interface SendRequest {
